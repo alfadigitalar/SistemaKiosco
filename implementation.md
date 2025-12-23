@@ -1,73 +1,120 @@
-# Plan de Implementación "Paso a Paso" - Sistema POS Novy
+# Plan de Implementación - Sistema POS "Novy"
 
-> [!NOTE] > **Cambio de Estrategia:** Debido a dificultades para compilar librerías nativas en Windows, hemos migrado a **`sql.js`**. Esta librería funciona con Javascript puro y no requiere instalaciones complejas en tu sistema.
-
-## Fase 1: Cimientos del Backend (Electron + SQLite)
-
-**Objetivo:** Tener la aplicación corriendo y la base de datos lista.
-
-1.  **Estructura de Archivos**: Configurar `main`, `preload` y `renderer` (Ya realizado).
-2.  **Base de Datos (`db.js`)**:
-    - **[HECHO]** Instalar `sql.js` (Alternativa puro JS).
-    - **[HECHO]** Configurar persistencia manual en archivo `novy.sqlite`.
-    - **[HECHO]** Script de creación de tablas: `users`, `products`, `clients`, `sales`, `sale_items`, `movements`.
-3.  **Lógica de Productos (`ipcHandlers.js`)**:
-    - **[HECHO]** Handlers para: `getProductos`, `buscarProducto`, `crearProducto`.
-    - Adaptados para usar la nueva librería `sql.js` (async/await simulado).
-4.  **Puente Seguro (`preload.js`)**:
-    - **[HECHO]** Exponer API segura via `contextBridge`.
-
-## Fase 2: Interfaz de Usuario y Seguridad (Frontend UI)
-
-**Objetivo:** Estructura visual profesional y segura.
-
-1.  **Configuración React**:
-    - Instalar `react-router-dom` (Navegación).
-    - Instalar `react-hot-toast` (Notificaciones).
-    - Instalar `lucide-react` (Iconos).
-2.  **Pantalla de Login**:
-    - Crear vista de inicio de sesión.
-    - IPC `loginUser`: Verificar credenciales contra la DB.
-3.  **Layout Principal**:
-    - Sidebar lateral fijo.
-    - Área de contenido dinámica.
-4.  **Error Boundary**: Protección contra pantallas blancas por errores.
-
-## Fase 3: La Pantalla de Ventas (Checkout)
-
-**Objetivo:** Interfaz ágil para cobrar.
-
-1.  **Interfaz POS (`PosScreen.jsx`)**:
-    - Dos columnas: Productos y Totales.
-    - Diseño Touch-Friendly.
-2.  **Lógica del Escáner**:
-    - Input "autofocus" invisible.
-    - Detectar `Enter` -> Búsqueda en DB.
-3.  **Carrito de Compras**:
-    - Manejo de estado (Zustand/State).
-
-## Fase 4: Procesar el Pago y Guardar
-
-**Objetivo:** Cerrar la venta.
-
-1.  **Modal de Pago**:
-    - Efectivo / Débito / Mixto.
-    - Calculadora de Vuelto.
-2.  **Guardado**:
-    - Transacción en DB (Venta + Items).
-    - Resta de Stock.
-
-## Fase 5: Gestión de Clientes y Fiados
-
-**Objetivo:** Créditos.
-
-1.  **Fiados**:
-    - Asignar cliente a venta.
-    - Registro de deuda en cta. cte.
+> [!NOTE] > **Cambio de Estrategia:** Migrado a **`sql.js`** (JavaScript puro) debido a dificultades de compilación de librerías nativas en Windows.
 
 ---
 
-## 🚀 Próximo Paso (Ahora)
+## 📋 Requisitos Técnicos (Stack)
 
-Vamos a instalar las librerías visuales para comenzar la **Fase 2**:
-`npm install react-router-dom react-hot-toast lucide-react clsx tailwind-merge`
+| Tecnología               | Requerida | Implementada               |
+| ------------------------ | --------- | -------------------------- |
+| Electron                 | ✅        | ✅                         |
+| React.js (Hooks)         | ✅        | ✅                         |
+| Tailwind CSS (Dark Mode) | ✅        | ✅                         |
+| Zustand / Context API    | ✅        | ⚠️ useState (simplificado) |
+| SQLite                   | ✅        | ✅ sql.js                  |
+| React Router DOM         | ✅        | ✅                         |
+| JavaScript ES6+          | ✅        | ✅                         |
+
+## 🏗️ Arquitectura
+
+| Requisito                   | Estado                               |
+| --------------------------- | ------------------------------------ |
+| IPC Main/Renderer separados | ✅                                   |
+| preload.js + contextBridge  | ✅                                   |
+| nodeIntegration: false      | ✅                                   |
+| Error Boundary global       | ✅                                   |
+| Estructura modular          | ⚠️ Por carpetas (screens/components) |
+
+## 💾 Base de Datos (SQLite)
+
+| Tabla        | Campos                                                                                       | Estado |
+| ------------ | -------------------------------------------------------------------------------------------- | ------ |
+| `users`      | id, name, username, password_hash, role, active                                              | ✅     |
+| `products`   | id, barcode, name, cost_price, sale_price, stock_quantity, min_stock, category_id, is_active | ✅     |
+| `clients`    | id, name, dni, phone, current_debt, is_active                                                | ✅     |
+| `sales`      | id, timestamp, user_id, client_id, total_amount, payment_method                              | ✅     |
+| `sale_items` | id, sale_id, product_id, quantity, unit_price_at_sale, subtotal                              | ✅     |
+| `movements`  | id, timestamp, type, amount, description, user_id                                            | ✅     |
+
+---
+
+## Fase 1: Cimientos del Backend ✅ COMPLETO
+
+- [x] Estructura de Archivos (`main`, `preload`, `renderer`)
+- [x] Conexión SQLite con `sql.js` + persistencia manual
+- [x] Creación de 6 tablas del schema
+- [x] IPC Handlers para Productos (getAll, search, add, getByBarcode)
+- [x] API segura via `contextBridge`
+
+## Fase 2: Interfaz de Usuario ✅ COMPLETO
+
+- [x] Librerías: `react-router-dom`, `react-hot-toast`, `lucide-react`
+- [x] Pantalla de Login con verificación contra DB
+- [x] Layout Principal (Sidebar + Contenido dinámico)
+- [x] Error Boundary (Dark Mode)
+- [x] Rutas configuradas en `App.jsx`
+
+## Fase 3: Pantalla de Ventas (POS) ✅ COMPLETO
+
+- [x] Layout 2 columnas (Lista Productos | Totales)
+- [x] Input escáner con autofocus permanente
+- [x] Búsqueda automática al presionar Enter
+- [x] Carrito: agregar, eliminar, calcular subtotales
+- [x] Diseño Touch-Friendly (botones grandes)
+
+## Fase 4: Procesar Pago ✅ COMPLETO
+
+- [x] Modal de Pago (`PaymentModal.jsx`)
+- [x] Métodos: Efectivo / Tarjeta / Mixto (split payment)
+- [x] Calculadora de Vuelto automática
+- [x] Guardar venta en tabla `sales` + `sale_items`
+- [x] Descontar stock automáticamente
+
+## Fase 5: Gestión de Clientes y Fiados ⏳ PENDIENTE
+
+- [ ] Pantalla `ClientesScreen.jsx` (CRUD)
+- [ ] Asignar cliente a venta
+- [ ] Campo `current_debt` actualizable
+- [ ] Función "Pago a Cuenta" (decrementar deuda)
+- [ ] Vista de deudas por cliente
+
+## Fase 6: Inventario (CRUD Productos) ⏳ PENDIENTE
+
+- [ ] Pantalla `InventarioScreen.jsx`
+- [ ] Tabla con todos los productos
+- [ ] Indicador visual (Rojo si `stock <= min_stock`)
+- [ ] Formulario crear/editar productos
+- [ ] Validación de código de barras único
+
+## Fase 7: Control de Caja ⏳ PENDIENTE
+
+- [ ] Función "Abrir Caja" (monto inicial)
+- [ ] Función "Cerrar Caja" (cuadre del día)
+- [ ] Registro de retiros manuales (gastos/proveedores)
+- [ ] Tabla `movements` para entradas/salidas
+- [ ] Reporte de cierre
+
+## Fase 8: Dashboard y Reportes ⏳ PENDIENTE
+
+- [ ] Ventas del día / semana / mes
+- [ ] Productos más vendidos
+- [ ] Alertas de stock bajo
+- [ ] Historial de ventas con filtros
+
+---
+
+## 🚀 Estado Actual
+
+| Fase | Descripción             | Estado |
+| ---- | ----------------------- | ------ |
+| 1    | Backend + SQLite        | ✅     |
+| 2    | UI + Login + Layout     | ✅     |
+| 3    | POS + Escáner + Carrito | ✅     |
+| 4    | Modal de Pago + Guardar | ✅     |
+| 5    | Clientes y Fiados       | ⏳     |
+| 6    | Inventario CRUD         | ⏳     |
+| 7    | Control de Caja         | ⏳     |
+| 8    | Dashboard/Reportes      | ⏳     |
+
+**Repositorio:** https://github.com/alfadigitalar/SistemaKiosco
