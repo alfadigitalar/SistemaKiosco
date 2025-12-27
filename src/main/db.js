@@ -36,9 +36,25 @@ async function initDatabase() {
       // Crear nueva base de datos en memoria
       db = new SQL.Database();
       console.log("Nueva base de datos creada en memoria.");
-      createTables();
-      saveDatabase(); // Guardar inmediatamente para crear el archivo
+      createTables(); // Crea todas las tablas iniciales
     }
+
+    // MIGRACIÓN MANUAL: Asegurar que exista la tabla cash_sessions (para DBs existentes)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS cash_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        opened_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        closed_at DATETIME,
+        initial_amount REAL,
+        final_amount REAL,
+        total_sales REAL,
+        total_movements REAL,
+        FOREIGN KEY(user_id) REFERENCES users(id)
+      );
+    `);
+
+    saveDatabase(); // Guardar cambios de estructura
   } catch (error) {
     console.error("Error al inicializar base de datos:", error);
     throw error;

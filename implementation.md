@@ -79,28 +79,28 @@
 - [x] Función "Pago a Cuenta" (decrementar deuda)
 - [x] Vista de deudas por cliente
 
-## Fase 6: Inventario (CRUD Productos) ⏳ PENDIENTE
+## Fase 6: Inventario (CRUD Productos) ✅ COMPLETO
 
-- [ ] Pantalla `InventarioScreen.jsx`
-- [ ] Tabla con todos los productos
-- [ ] Indicador visual (Rojo si `stock <= min_stock`)
-- [ ] Formulario crear/editar productos
-- [ ] Validación de código de barras único
+- [x] Pantalla `InventarioScreen.jsx`
+- [x] Tabla con todos los productos
+- [x] Indicador visual (Rojo si `stock <= min_stock`)
+- [x] Formulario crear/editar productos
+- [x] Validación de código de barras único
 
-## Fase 7: Control de Caja ⏳ PENDIENTE
+## Fase 7: Control de Caja ✅ COMPLETO
 
-- [ ] Función "Abrir Caja" (monto inicial)
-- [ ] Función "Cerrar Caja" (cuadre del día)
-- [ ] Registro de retiros manuales (gastos/proveedores)
-- [ ] Tabla `movements` para entradas/salidas
-- [ ] Reporte de cierre
+- [x] Función "Abrir Caja" (monto inicial)
+- [x] Función "Cerrar Caja" (cuadre del día)
+- [x] Registro de retiros manuales (gastos/proveedores)
+- [x] Tabla `movements` para entradas/salidas
+- [x] Reporte de cierre
 
-## Fase 8: Dashboard y Reportes ⏳ PENDIENTE
+## Fase 8: Dashboard y Reportes ✅ COMPLETO
 
-- [ ] Ventas del día / semana / mes
-- [ ] Productos más vendidos
-- [ ] Alertas de stock bajo
-- [ ] Historial de ventas con filtros
+- [x] Ventas del día / semana / mes
+- [x] Productos más vendidos
+- [x] Alertas de stock bajo
+- [x] Historial de ventas con filtros
 
 ---
 
@@ -113,8 +113,32 @@
 | 3    | POS + Escáner + Carrito | ✅     |
 | 4    | Modal de Pago + Guardar | ✅     |
 | 5    | Clientes y Fiados       | ✅     |
-| 6    | Inventario CRUD         | ⏳     |
-| 7    | Control de Caja         | ⏳     |
-| 8    | Dashboard/Reportes      | ⏳     |
+| 6    | Inventario CRUD         | ✅     |
+
+## Fase 9: Proveedores y Pedidos (PDF) ✅ COMPLETO
+
+- [x] Backend: Tabla `suppliers` y Handlers CRUD
+- [x] Frontend: Pantalla `ProveedoresScreen.jsx` (ABM)
+- [x] Frontend: Generador de Pedidos
+  - [x] Selección de proveedor y productos
+  - [x] Botón "Cargar Faltantes" (Stock bajo)
+  - [x] Exportación a PDF (jsPDF)
+- [x] Integración en `App.jsx`
+
+---
+
+## 🚀 Estado Actual
+
+| Fase | Descripción             | Estado |
+| ---- | ----------------------- | ------ |
+| 1    | Backend + SQLite        | ✅     |
+| 2    | UI + Login + Layout     | ✅     |
+| 3    | POS + Escáner + Carrito | ✅     |
+| 4    | Modal de Pago + Guardar | ✅     |
+| 5    | Clientes y Fiados       | ✅     |
+| 6    | Inventario CRUD         | ✅     |
+| 7    | Control de Caja         | ✅     |
+| 8    | Dashboard/Reportes      | ✅     |
+| 9    | Proveedores y Pedidos   | ✅     |
 
 **Repositorio:** https://github.com/alfadigitalar/SistemaKiosco

@@ -81,6 +81,61 @@ function registerIpcHandlers() {
       return { success: true };
     } catch (error) {
       console.error("Error al crear producto:", error);
+      // Mejorar mensaje si es error de duplicado
+      if (error.message.includes("UNIQUE constraint failed")) {
+        return { success: false, error: "El código de barras ya existe." };
+      }
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Actualizar producto
+  ipcMain.handle("update-product", async (event, product) => {
+    try {
+      const {
+        id,
+        barcode,
+        name,
+        cost_price,
+        sale_price,
+        stock_quantity,
+        min_stock,
+        category_id,
+      } = product;
+
+      await run(
+        `UPDATE products 
+         SET barcode=?, name=?, cost_price=?, sale_price=?, stock_quantity=?, min_stock=?, category_id=? 
+         WHERE id=?`,
+        [
+          barcode,
+          name,
+          cost_price,
+          sale_price,
+          stock_quantity,
+          min_stock,
+          category_id,
+          id,
+        ]
+      );
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error al actualizar producto:", error);
+      if (error.message.includes("UNIQUE constraint failed")) {
+        return { success: false, error: "El código de barras ya existe." };
+      }
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Eliminar producto (Soft Delete)
+  ipcMain.handle("delete-product", async (event, id) => {
+    try {
+      await run("UPDATE products SET is_active = 0 WHERE id = ?", [id]);
+      return { success: true };
+    } catch (error) {
+      console.error("Error al eliminar producto:", error);
       return { success: false, error: error.message };
     }
   });
@@ -244,6 +299,340 @@ function registerIpcHandlers() {
       }
     }
   );
+
+  // ═══════════════════════════════════════════════════════════
+  // HANDLERS DE CONTROL DE CAJA
+  // ═══════════════════════════════════════════════════════════
+
+  // Obtener sesión actual (si hay una abierta)
+  ipcMain.handle("get-current-session", async () => {
+    try {
+      const session = await get(
+        "SELECT * FROM cash_sessions WHERE closed_at IS NULL ORDER BY id DESC LIMIT 1"
+      );
+      return session;
+    } catch (error) {
+      console.error("Error al obtener sesión de caja:", error);
+      return null;
+    }
+  });
+
+  // Abrir Caja
+  ipcMain.handle(
+    "open-cash-session",
+    async (event, { initialAmount, userId }) => {
+      try {
+        // Verificar si ya hay una abierta
+        const existing = await get(
+          "SELECT id FROM cash_sessions WHERE closed_at IS NULL"
+        );
+        if (existing) {
+          return { success: false, message: "Ya hay una caja abierta." };
+        }
+
+        await run(
+          "INSERT INTO cash_sessions (user_id, initial_amount) VALUES (?, ?)",
+          [userId, initialAmount]
+        );
+        return { success: true };
+      } catch (error) {
+        console.error("Error al abrir caja:", error);
+        return { success: false, message: error.message };
+      }
+    }
+  );
+
+  // Cerrar Caja
+  ipcMain.handle(
+    "close-cash-session",
+    async (event, { sessionId, finalAmount, totalSales, totalMovements }) => {
+      try {
+        await run(
+          `UPDATE cash_sessions 
+         SET closed_at = CURRENT_TIMESTAMP, final_amount = ?, total_sales = ?, total_movements = ? 
+         WHERE id = ?`,
+          [finalAmount, totalSales, totalMovements, sessionId]
+        );
+        return { success: true };
+      } catch (error) {
+        console.error("Error al cerrar caja:", error);
+        return { success: false, message: error.message };
+      }
+    }
+  );
+
+  // Obtener Resumen de Caja (Ventas, Movimientos, Deudoas)
+  ipcMain.handle("get-cash-summary", async (event, sessionId) => {
+    try {
+      // 1. Obtener fecha de inicio de la sesión
+      const session = await get(
+        "SELECT opened_at, initial_amount FROM cash_sessions WHERE id = ?",
+        [sessionId]
+      );
+      if (!session) throw new Error("Sesión no encontrada");
+
+      const startDate = session.opened_at;
+
+      // 2. Sumar Ventas en EFECTIVO desde esa fecha
+      // Nota: asumimos que payment_method 'cash' es efectivo.
+      const salesResult = await get(
+        `SELECT SUM(total_amount) as total 
+         FROM sales 
+         WHERE timestamp >= ? AND payment_method = 'efectivo'`, // Ajustar 'efectivo' según como lo guardes en POS
+        [startDate]
+      );
+      const totalSalesCash = salesResult.total || 0;
+
+      // 3. Sumar Movimientos (Entradas y Salidas)
+      const movementsResult = await all(
+        "SELECT type, SUM(amount) as total FROM movements WHERE timestamp >= ? GROUP BY type",
+        [startDate]
+      );
+
+      let totalIn = 0;
+      let totalOut = 0;
+
+      movementsResult.forEach((row) => {
+        if (row.type === "entry") totalIn += row.total;
+        if (row.type === "withdrawal") totalOut += row.total;
+      });
+
+      // Calculo final teórico
+      const finalBalance =
+        session.initial_amount + totalSalesCash + totalIn - totalOut;
+
+      return {
+        initialAmount: session.initial_amount,
+        totalSalesCash,
+        totalIn,
+        totalOut,
+        finalBalance,
+      };
+    } catch (error) {
+      console.error("Error al obtener resumen:", error);
+      return { error: error.message };
+    }
+  });
+
+  // Agregar Movimiento Manual
+  ipcMain.handle("add-cash-movement", async (event, movement) => {
+    try {
+      const { type, amount, description, userId } = movement;
+      await run(
+        "INSERT INTO movements (type, amount, description, user_id) VALUES (?, ?, ?, ?)",
+        [type, amount, description, userId]
+      );
+      return { success: true };
+    } catch (error) {
+      console.error("Error al agregar movimiento:", error);
+      return { success: false, message: error.message };
+    }
+  });
+
+  // Obtener Movimientos Recientes
+  ipcMain.handle("get-movements", async (event, limit = 50) => {
+    try {
+      const rows = await all(
+        "SELECT * FROM movements ORDER BY id DESC LIMIT ?",
+        [limit]
+      );
+      return rows;
+    } catch (error) {
+      return [];
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // HANDLERS DE ESTADÍSTICAS Y DASHBOARD
+  // ═══════════════════════════════════════════════════════════
+
+  ipcMain.handle("get-dashboard-stats", async () => {
+    try {
+      const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      const firstDayOfMonth = new Date(
+        new Date().getFullYear(),
+        new Date().getMonth(),
+        1
+      )
+        .toISOString()
+        .split("T")[0];
+
+      // 1. Ventas de Hoy
+      const salesToday = await get(
+        "SELECT SUM(total_amount) as total FROM sales WHERE date(timestamp) = date('now', 'localtime')"
+      );
+
+      // 2. Ventas del Mes
+      const salesMonth = await get(
+        "SELECT SUM(total_amount) as total FROM sales WHERE date(timestamp) >= ?",
+        [firstDayOfMonth]
+      );
+
+      // 3. Productos con Stock Bajo
+      const lowStock = await get(
+        "SELECT COUNT(*) as count FROM products WHERE stock_quantity <= min_stock AND is_active = 1"
+      );
+
+      // 4. Últimas 5 ventas
+      const lastSales = await all(
+        `SELECT s.id, s.timestamp, s.total_amount, u.name as user_name 
+         FROM sales s 
+         LEFT JOIN users u ON s.user_id = u.id 
+         ORDER BY s.id DESC LIMIT 5`
+      );
+
+      // 5. Top 5 Productos más vendidos (Histórico)
+      const topProducts = await all(
+        `SELECT p.name, SUM(si.quantity) as total_qty
+         FROM sale_items si
+         JOIN products p ON si.product_id = p.id
+         GROUP BY si.product_id
+         ORDER BY total_qty DESC
+         LIMIT 5`
+      );
+
+      // 6. Ventas últimos 7 días (para gráfico)
+      const salesLast7Days = await all(
+        `SELECT date(timestamp) as date, SUM(total_amount) as total
+         FROM sales
+         WHERE date(timestamp) >= date('now', '-6 days')
+         GROUP BY date(timestamp)
+         ORDER BY date(timestamp) ASC`
+      );
+
+      return {
+        totalDay: salesToday?.total || 0,
+        totalMonth: salesMonth?.total || 0,
+        lowStockCount: lowStock?.count || 0,
+        lastSales,
+        topProducts,
+        salesChartData: salesLast7Days,
+      };
+    } catch (error) {
+      console.error("Error al obtener stats:", error);
+      return {
+        totalDay: 0,
+        totalMonth: 0,
+        lowStockCount: 0,
+        lastSales: [],
+        topProducts: [],
+        salesChartData: [],
+      };
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // HANDLERS DE HISTORIAL
+  // ═══════════════════════════════════════════════════════════
+
+  ipcMain.handle("get-sales-history", async (event, { startDate, endDate }) => {
+    try {
+      let query = `
+        SELECT s.id, s.timestamp, s.total_amount, s.payment_method, 
+               c.name as client_name, u.name as user_name
+        FROM sales s
+        LEFT JOIN clients c ON s.client_id = c.id
+        LEFT JOIN users u ON s.user_id = u.id
+        WHERE 1=1
+      `;
+
+      const params = [];
+
+      if (startDate) {
+        query += " AND date(s.timestamp) >= ?";
+        params.push(startDate);
+      }
+      if (endDate) {
+        query += " AND date(s.timestamp) <= ?";
+        params.push(endDate);
+      }
+
+      query += " ORDER BY s.id DESC LIMIT 100"; // Límite de seguridad
+
+      const rows = await all(query, params);
+      return rows;
+    } catch (error) {
+      console.error("Error al obtener historial:", error);
+      return [];
+    }
+  });
+
+  // Obtener detalle de una venta
+  ipcMain.handle("get-sale-details", async (event, saleId) => {
+    try {
+      const items = await all(
+        `
+            SELECT si.*, p.name as product_name, p.barcode
+            FROM sale_items si
+            LEFT JOIN products p ON si.product_id = p.id
+            WHERE si.sale_id = ?
+          `,
+        [saleId]
+      );
+      return items;
+    } catch (error) {
+      console.error("Error al obtener detalle venta:", error);
+      return [];
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // HANDLERS DE PROVEEDORES
+  // ═══════════════════════════════════════════════════════════
+
+  // Obtener proveedores
+  ipcMain.handle("get-suppliers", async () => {
+    try {
+      const rows = await all(
+        "SELECT * FROM suppliers WHERE is_active = 1 ORDER BY name ASC"
+      );
+      return rows;
+    } catch (error) {
+      console.error("Error al obtener proveedores:", error);
+      return [];
+    }
+  });
+
+  // Crear proveedor
+  ipcMain.handle("create-supplier", async (event, supplier) => {
+    try {
+      const { name, contact_name, phone, email, notes } = supplier;
+      await run(
+        "INSERT INTO suppliers (name, contact_name, phone, email, notes) VALUES (?, ?, ?, ?, ?)",
+        [name, contact_name, phone, email, notes]
+      );
+      return { success: true };
+    } catch (error) {
+      console.error("Error al crear proveedor:", error);
+      return { success: false, message: error.message };
+    }
+  });
+
+  // Actualizar proveedor
+  ipcMain.handle("update-supplier", async (event, supplier) => {
+    try {
+      const { id, name, contact_name, phone, email, notes } = supplier;
+      await run(
+        "UPDATE suppliers SET name=?, contact_name=?, phone=?, email=?, notes=? WHERE id=?",
+        [name, contact_name, phone, email, notes, id]
+      );
+      return { success: true };
+    } catch (error) {
+      console.error("Error al actualizar proveedor:", error);
+      return { success: false, message: error.message };
+    }
+  });
+
+  // Eliminar proveedor
+  ipcMain.handle("delete-supplier", async (event, id) => {
+    try {
+      await run("UPDATE suppliers SET is_active = 0 WHERE id = ?", [id]);
+      return { success: true };
+    } catch (error) {
+      console.error("Error al eliminar proveedor:", error);
+      return { success: false, message: error.message };
+    }
+  });
 
   // ═══════════════════════════════════════════════════════════
   // HANDLERS DE USUARIO / AUTENTICACIÓN

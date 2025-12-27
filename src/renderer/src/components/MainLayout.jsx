@@ -7,6 +7,7 @@ import {
   Truck,
   History,
   LogOut,
+  DollarSign,
 } from "lucide-react";
 
 export default function MainLayout() {
@@ -36,6 +37,12 @@ export default function MainLayout() {
             className="flex items-center gap-3 p-3 hover:bg-slate-700 rounded transition"
           >
             <ShoppingCart size={20} /> Nueva Venta
+          </Link>
+          <Link
+            to="/caja"
+            className="flex items-center gap-3 p-3 hover:bg-slate-700 rounded transition"
+          >
+            <DollarSign size={20} /> Control de Caja
           </Link>
           <Link
             to="/inventario"

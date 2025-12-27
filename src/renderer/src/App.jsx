@@ -7,39 +7,16 @@ import {
 import LoginScreen from "./screens/LoginScreen";
 import PosScreen from "./screens/PosScreen";
 import CustomersScreen from "./screens/CustomersScreen";
+import InventarioScreen from "./screens/InventarioScreen";
+import CajaScreen from "./screens/CajaScreen";
 import ErrorBoundary from "./components/ErrorBoundary";
 import MainLayout from "./components/MainLayout";
 
+import DashboardScreen from "./screens/DashboardScreen";
+import HistorialScreen from "./screens/HistorialScreen";
+import ProveedoresScreen from "./screens/ProveedoresScreen";
+
 // Componentes Placeholder para secciones futuras
-const Dashboard = () => {
-  return <h1 className="text-2xl font-bold">Resumen del Día - Próximamente</h1>;
-};
-
-const Inventario = () => {
-  return (
-    <h1 className="text-2xl font-bold">Gestión de Stock - Próximamente</h1>
-  );
-};
-
-const Clientes = () => {
-  return (
-    <h1 className="text-2xl font-bold">Gestión de Clientes - Próximamente</h1>
-  );
-};
-
-const Proveedores = () => {
-  return (
-    <h1 className="text-2xl font-bold">
-      Gestión de Proveedores - Próximamente
-    </h1>
-  );
-};
-
-const Historial = () => {
-  return (
-    <h1 className="text-2xl font-bold">Historial de Ventas - Próximamente</h1>
-  );
-};
 
 function App() {
   return (
@@ -58,12 +35,13 @@ function App() {
 
             {/* Rutas Privadas - Dentro del Layout con Sidebar */}
             <Route element={<MainLayout />}>
-              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/dashboard" element={<DashboardScreen />} />
               <Route path="/ventas" element={<PosScreen />} />
-              <Route path="/inventario" element={<Inventario />} />
+              <Route path="/caja" element={<CajaScreen />} />
+              <Route path="/inventario" element={<InventarioScreen />} />
               <Route path="/clientes" element={<CustomersScreen />} />
-              <Route path="/proveedores" element={<Proveedores />} />
-              <Route path="/historial" element={<Historial />} />
+              <Route path="/proveedores" element={<ProveedoresScreen />} />
+              <Route path="/historial" element={<HistorialScreen />} />
             </Route>
           </Routes>
         </ErrorBoundary>

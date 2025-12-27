@@ -25,6 +25,12 @@ contextBridge.exposeInMainWorld("api", {
   // Crear nuevo producto
   addProduct: (product) => ipcRenderer.invoke("add-product", product),
 
+  // Actualizar producto
+  updateProduct: (product) => ipcRenderer.invoke("update-product", product),
+
+  // Eliminar producto
+  deleteProduct: (id) => ipcRenderer.invoke("delete-product", id),
+
   // ═══════════════════════════════════════════════════════════
   // MÉTODOS DE VENTAS
   // ═══════════════════════════════════════════════════════════
@@ -42,6 +48,34 @@ contextBridge.exposeInMainWorld("api", {
   deleteCustomer: (id) => ipcRenderer.invoke("delete-customer", id),
   processDebtPayment: (data) =>
     ipcRenderer.invoke("process-debt-payment", data),
+
+  // ═══════════════════════════════════════════════════════════
+  // MÉTODOS DE CAJA (CASH CONTROL)
+  // ═══════════════════════════════════════════════════════════
+  getCurrentSession: () => ipcRenderer.invoke("get-current-session"),
+  openCashSession: (data) => ipcRenderer.invoke("open-cash-session", data),
+  closeCashSession: (data) => ipcRenderer.invoke("close-cash-session", data),
+  getCashSummary: (sessionId) =>
+    ipcRenderer.invoke("get-cash-summary", sessionId),
+  addCashMovement: (movement) =>
+    ipcRenderer.invoke("add-cash-movement", movement),
+  getMovements: (limit) => ipcRenderer.invoke("get-movements", limit),
+
+  // ═══════════════════════════════════════════════════════════
+  // MÉTODOS DE ESTADÍSTICAS Y REPORTES
+  // ═══════════════════════════════════════════════════════════
+  getDashboardStats: () => ipcRenderer.invoke("get-dashboard-stats"),
+  getSalesHistory: (filters) =>
+    ipcRenderer.invoke("get-sales-history", filters),
+  getSaleDetails: (saleId) => ipcRenderer.invoke("get-sale-details", saleId),
+
+  // ═══════════════════════════════════════════════════════════
+  // MÉTODOS DE PROVEEDORES
+  // ═══════════════════════════════════════════════════════════
+  getSuppliers: () => ipcRenderer.invoke("get-suppliers"),
+  createSupplier: (data) => ipcRenderer.invoke("create-supplier", data),
+  updateSupplier: (data) => ipcRenderer.invoke("update-supplier", data),
+  deleteSupplier: (id) => ipcRenderer.invoke("delete-supplier", id),
 
   // ═══════════════════════════════════════════════════════════
   // MÉTODOS DE USUARIO / AUTENTICACIÓN
