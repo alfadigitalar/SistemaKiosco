@@ -165,18 +165,17 @@ function registerIpcHandlers() {
       const { items, total, paymentMethod, userId, clientId } = saleData;
 
       // 1. Insertar venta principal
-      await run(
+      const insertResult = await run(
         `INSERT INTO sales (user_id, client_id, total_amount, payment_method)
          VALUES (?, ?, ?, ?)`,
         [userId || 1, clientId || null, total, paymentMethod]
       );
 
       // Obtener el ID de la venta recién creada
-      const lastSale = await get("SELECT last_insert_rowid() as id");
-      const saleId = lastSale?.id;
+      const saleId = insertResult.lastId;
 
       if (!saleId) {
-        throw new Error("No se pudo obtener el ID de la venta");
+        throw new Error("No se pudo obtener el ID de la venta (lastId null)");
       }
 
       // 2. Insertar items y descontar stock
@@ -238,13 +237,19 @@ function registerIpcHandlers() {
   ipcMain.handle("create-customer", async (event, customer) => {
     try {
       const { name, dni, phone, current_debt } = customer;
+      // Tratar DNI vacío como NULL para evitar error de UNIQUE
+      const safeDni = dni && dni.trim() !== "" ? dni.trim() : null;
+
       await run(
         "INSERT INTO clients (name, dni, phone, current_debt) VALUES (?, ?, ?, ?)",
-        [name, dni, phone, current_debt || 0]
+        [name, safeDni, phone, current_debt || 0]
       );
       return { success: true };
     } catch (error) {
       console.error("Error al crear cliente:", error);
+      if (error.message.includes("UNIQUE constraint failed")) {
+        return { success: false, message: "El DNI ya existe." };
+      }
       return { success: false, message: error.message };
     }
   });
@@ -253,13 +258,18 @@ function registerIpcHandlers() {
   ipcMain.handle("update-customer", async (event, customer) => {
     try {
       const { id, name, dni, phone, current_debt } = customer;
+      const safeDni = dni && dni.trim() !== "" ? dni.trim() : null;
+
       await run(
         "UPDATE clients SET name = ?, dni = ?, phone = ?, current_debt = ? WHERE id = ?",
-        [name, dni, phone, current_debt, id]
+        [name, safeDni, phone, current_debt, id]
       );
       return { success: true };
     } catch (error) {
       console.error("Error al actualizar cliente:", error);
+      if (error.message.includes("UNIQUE constraint failed")) {
+        return { success: false, message: "El DNI ya existe." };
+      }
       return { success: false, message: error.message };
     }
   });
@@ -630,6 +640,48 @@ function registerIpcHandlers() {
       return { success: true };
     } catch (error) {
       console.error("Error al eliminar proveedor:", error);
+      return { success: false, message: error.message };
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // HANDLERS DE CONFIGURACIÓN
+  // ═══════════════════════════════════════════════════════════
+
+  // Obtener configuraciones
+  ipcMain.handle("get-settings", async () => {
+    try {
+      const rows = await all("SELECT * FROM settings");
+      const settings = {
+        kiosk_name: "Kiosco System",
+        theme_color: "blue",
+      };
+      rows.forEach((row) => {
+        settings[row.key] = row.value;
+      });
+      return settings;
+    } catch (error) {
+      console.error("Error al obtener settings:", error);
+      return { kiosk_name: "Kiosco System", theme_color: "blue" };
+    }
+  });
+
+  // Actualizar configuraciones
+  ipcMain.handle("update-settings", async (event, settings) => {
+    try {
+      // settings es un objeto { kiosk_name: '...', theme_color: '...' }
+      for (const [key, value] of Object.entries(settings)) {
+        // Upsert manual: intentar update, si no afecta filas, hacer insert
+        // SQLite no tiene ON CONFLICT en UPDATE standard fácilmente sin UNIQUE index, pero key es PK.
+        // Usaremos REPLACE INTO o INSERT OR REPLACE
+        await run(
+          "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+          [key, value]
+        );
+      }
+      return { success: true };
+    } catch (error) {
+      console.error("Error al actualizar settings:", error);
       return { success: false, message: error.message };
     }
   });

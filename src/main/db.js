@@ -54,6 +54,44 @@ async function initDatabase() {
       );
     `);
 
+    // MIGRACIÓN MANUAL: Tabla Proveedores (Fase 9)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS suppliers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        contact_name TEXT,
+        phone TEXT,
+        email TEXT,
+        notes TEXT,
+        is_active INTEGER DEFAULT 1
+      );
+    `);
+
+    // MIGRACIÓN MANUAL: Tabla Settings (Fase 10)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );
+    `);
+
+    // Default settings
+    const existingSettings = db.exec(
+      "SELECT * FROM settings WHERE key = 'kiosk_name'"
+    );
+    if (!existingSettings.length || !existingSettings[0].values.length) {
+      try {
+        db.run(
+          "INSERT INTO settings (key, value) VALUES ('kiosk_name', 'Kiosco System')"
+        );
+        db.run(
+          "INSERT INTO settings (key, value) VALUES ('theme_color', 'blue')"
+        );
+      } catch (e) {
+        // Ignorar si ya existen
+      }
+    }
+
     saveDatabase(); // Guardar cambios de estructura
   } catch (error) {
     console.error("Error al inicializar base de datos:", error);
@@ -82,8 +120,22 @@ function run(sql, params = []) {
   if (!db) return Promise.reject(new Error("Base de datos no inicializada"));
   try {
     db.run(sql, params);
+
+    // Intentar obtener el último ID insertado
+    // db.exec devuelve: [{ columns: ['last_insert_rowid()'], values: [[id]] }]
+    let lastId = null;
+    try {
+      const stmt = db.prepare("SELECT last_insert_rowid()");
+      if (stmt.step()) {
+        lastId = stmt.get()[0];
+      }
+      stmt.free();
+    } catch (e) {
+      console.warn("Could not retrieve lastId", e);
+    }
+
     saveDatabase(); // Auto-guardar para persistencia
-    return Promise.resolve({ success: true });
+    return Promise.resolve({ success: true, lastId });
   } catch (err) {
     console.error("Error en run():", err);
     return Promise.reject(err);

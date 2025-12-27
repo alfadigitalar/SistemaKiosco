@@ -218,16 +218,20 @@ const ProveedoresScreen = () => {
     .slice(0, 5); // Solo mostrar 5 sugerencias
 
   return (
-    <div className="h-full flex flex-col p-6 space-y-6 overflow-hidden bg-slate-900 text-white">
+    <div className="h-full flex flex-col p-6 space-y-6 overflow-hidden bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white transition-colors duration-300">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-white">Proveedores</h1>
-          <p className="text-slate-400">Gestión de compras y pedidos</p>
+          <h1 className="text-3xl font-bold text-slate-800 dark:text-white">
+            Proveedores
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400">
+            Gestión de compras y pedidos
+          </p>
         </div>
         <button
           onClick={() => handleOpenModal()}
-          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
         >
           <Plus size={20} />
           Nuevo Proveedor
@@ -235,12 +239,12 @@ const ProveedoresScreen = () => {
       </div>
 
       {/* Search Bar */}
-      <div className="bg-slate-800 p-4 rounded-xl flex items-center gap-4 border border-slate-700">
+      <div className="bg-white dark:bg-slate-800 p-4 rounded-xl flex items-center gap-4 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
         <Search className="text-slate-400" />
         <input
           type="text"
           placeholder="Buscar proveedor..."
-          className="bg-transparent border-none outline-none text-white w-full placeholder-slate-500"
+          className="bg-transparent border-none outline-none text-slate-900 dark:text-white w-full placeholder-slate-400 dark:placeholder-slate-500"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -251,48 +255,54 @@ const ProveedoresScreen = () => {
         {filteredSuppliers.map((supplier) => (
           <div
             key={supplier.id}
-            className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg group hover:border-blue-500/50 transition-all"
+            className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg group hover:border-blue-500/50 transition-all"
           >
             <div className="flex justify-between items-start mb-4">
-              <div className="p-3 bg-blue-900/30 rounded-lg text-blue-400">
+              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
                 <Truck size={24} />
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => handleOpenOrder(supplier)}
                   title="Crear Pedido"
-                  className="p-2 hover:bg-slate-700 rounded-lg text-green-400 transition"
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-green-600 dark:text-green-400 transition"
                 >
                   <FileText size={18} />
                 </button>
                 <button
                   onClick={() => handleOpenModal(supplier)}
-                  className="p-2 hover:bg-slate-700 rounded-lg text-blue-400 transition"
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-blue-600 dark:text-blue-400 transition"
                 >
                   <Edit size={18} />
                 </button>
                 <button
                   onClick={() => handleDeleteSupplier(supplier.id)}
-                  className="p-2 hover:bg-slate-700 rounded-lg text-red-400 transition"
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-red-600 dark:text-red-400 transition"
                 >
                   <Trash2 size={18} />
                 </button>
               </div>
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">
+            <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">
               {supplier.name}
             </h3>
-            <div className="space-y-1 text-sm text-slate-400">
+            <div className="space-y-1 text-sm text-slate-500 dark:text-slate-400">
               <p>
-                <span className="font-semibold text-slate-500">Contacto:</span>{" "}
+                <span className="font-semibold text-slate-700 dark:text-slate-500">
+                  Contacto:
+                </span>{" "}
                 {supplier.contact_name || "-"}
               </p>
               <p>
-                <span className="font-semibold text-slate-500">Tel:</span>{" "}
+                <span className="font-semibold text-slate-700 dark:text-slate-500">
+                  Tel:
+                </span>{" "}
                 {supplier.phone || "-"}
               </p>
               <p>
-                <span className="font-semibold text-slate-500">Email:</span>{" "}
+                <span className="font-semibold text-slate-700 dark:text-slate-500">
+                  Email:
+                </span>{" "}
                 {supplier.email || "-"}
               </p>
             </div>
@@ -303,18 +313,18 @@ const ProveedoresScreen = () => {
       {/* Modal CRUD Proveedor */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-lg border border-slate-700 p-6 shadow-2xl">
-            <h2 className="text-xl font-bold mb-6">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg border border-slate-200 dark:border-slate-700 p-6 shadow-2xl transition-colors">
+            <h2 className="text-xl font-bold mb-6 text-slate-800 dark:text-white">
               {currentSupplier ? "Editar Proveedor" : "Nuevo Proveedor"}
             </h2>
             <form onSubmit={handleSaveSupplier} className="space-y-4">
               <div>
-                <label className="block text-xs text-slate-400 mb-1">
+                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
                   Empresa / Nombre
                 </label>
                 <input
                   required
-                  className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 outline-none focus:ring-2"
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 outline-none focus:ring-2 text-slate-900 dark:text-white transition-colors"
                   value={formData.name}
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
@@ -322,11 +332,11 @@ const ProveedoresScreen = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs text-slate-400 mb-1">
+                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
                   Nombre de Contacto
                 </label>
                 <input
-                  className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 outline-none focus:ring-2"
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 outline-none focus:ring-2 text-slate-900 dark:text-white transition-colors"
                   value={formData.contact_name}
                   onChange={(e) =>
                     setFormData({ ...formData, contact_name: e.target.value })
@@ -335,11 +345,11 @@ const ProveedoresScreen = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">
+                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
                     Teléfono
                   </label>
                   <input
-                    className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 outline-none focus:ring-2"
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 outline-none focus:ring-2 text-slate-900 dark:text-white transition-colors"
                     value={formData.phone}
                     onChange={(e) =>
                       setFormData({ ...formData, phone: e.target.value })
@@ -347,12 +357,12 @@ const ProveedoresScreen = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">
+                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
                     Email
                   </label>
                   <input
                     type="email"
-                    className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 outline-none focus:ring-2"
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 outline-none focus:ring-2 text-slate-900 dark:text-white transition-colors"
                     value={formData.email}
                     onChange={(e) =>
                       setFormData({ ...formData, email: e.target.value })
@@ -364,7 +374,7 @@ const ProveedoresScreen = () => {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="text-slate-400 hover:text-white px-4 py-2"
+                  className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white px-4 py-2"
                 >
                   Cancelar
                 </button>
@@ -383,22 +393,23 @@ const ProveedoresScreen = () => {
       {/* Modal Generar Pedido */}
       {isOrderModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-4xl border border-slate-700 flex flex-col max-h-[90vh] shadow-2xl">
-            <div className="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-900/50 rounded-t-2xl">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-4xl border border-slate-200 dark:border-slate-700 flex flex-col max-h-[90vh] shadow-2xl transition-colors">
+            <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 rounded-t-2xl">
               <div>
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  <FileText className="text-blue-400" /> Nuevo Pedido
+                <h2 className="text-xl font-bold flex items-center gap-2 text-slate-800 dark:text-white">
+                  <FileText className="text-blue-600 dark:text-blue-400" />{" "}
+                  Nuevo Pedido
                 </h2>
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
                   Proveedor:{" "}
-                  <span className="text-white font-medium">
+                  <span className="text-slate-900 dark:text-white font-medium">
                     {orderSupplier.name}
                   </span>
                 </p>
               </div>
               <button
                 onClick={() => setIsOrderModalOpen(false)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white"
               >
                 <X size={24} />
               </button>
@@ -406,10 +417,10 @@ const ProveedoresScreen = () => {
 
             <div className="p-6 overflow-y-auto flex-1 space-y-6">
               {/* Acciones Rápidas */}
-              <div className="flex gap-4 items-center bg-slate-700/20 p-4 rounded-xl border border-slate-700 border-dashed">
+              <div className="flex gap-4 items-center bg-slate-100 dark:bg-slate-700/20 p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
                 <button
                   onClick={handleLoadLowStock}
-                  className="px-4 py-2 bg-yellow-600/20 text-yellow-500 border border-yellow-600/50 rounded-lg hover:bg-yellow-600/30 transition flex items-center gap-2 text-sm font-bold"
+                  className="px-4 py-2 bg-yellow-100 dark:bg-yellow-600/20 text-yellow-700 dark:text-yellow-500 border border-yellow-200 dark:border-yellow-600/50 rounded-lg hover:bg-yellow-200/50 dark:hover:bg-yellow-600/30 transition flex items-center gap-2 text-sm font-bold"
                 >
                   <Download size={16} /> Cargar Faltantes (Stock Bajo)
                 </button>
@@ -421,25 +432,25 @@ const ProveedoresScreen = () => {
                   <input
                     type="text"
                     placeholder="Buscar producto para agregar..."
-                    className="w-full bg-slate-900 border border-slate-600 rounded-lg py-2 pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg py-2 pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-white"
                     value={productSearch}
                     onChange={(e) => setProductSearch(e.target.value)}
                   />
                   {/* Dropdown sugerencias */}
                   {productSearch && (
-                    <div className="absolute top-full left-0 w-full bg-slate-800 border border-slate-600 rounded-lg mt-1 shadow-xl z-10 overflow-hidden">
+                    <div className="absolute top-full left-0 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg mt-1 shadow-xl z-10 overflow-hidden">
                       {filteredProducts.map((p) => (
                         <button
                           key={p.id}
                           onClick={() => handleAddProductToOrder(p)}
-                          className="w-full text-left p-3 hover:bg-slate-700 flex justify-between items-center text-sm border-b border-slate-700/50 last:border-0"
+                          className="w-full text-left p-3 hover:bg-slate-100 dark:hover:bg-slate-700 flex justify-between items-center text-sm border-b border-slate-100 dark:border-slate-700/50 last:border-0 text-slate-900 dark:text-white"
                         >
                           <span>{p.name}</span>
                           <span
                             className={`text-xs px-2 py-0.5 rounded ${
                               p.stock_quantity <= p.min_stock
-                                ? "bg-red-900/30 text-red-500"
-                                : "bg-green-900/30 text-green-500"
+                                ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-500"
+                                : "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-500"
                             }`}
                           >
                             Stock: {p.stock_quantity}
@@ -453,7 +464,7 @@ const ProveedoresScreen = () => {
 
               {/* Tabla Items */}
               <table className="w-full text-left border-collapse">
-                <thead className="text-xs uppercase text-slate-400 border-b border-slate-700">
+                <thead className="text-xs uppercase text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
                   <tr>
                     <th className="pb-3 pl-2">Producto</th>
                     <th className="pb-3 text-center">Stock Actual</th>
@@ -461,7 +472,7 @@ const ProveedoresScreen = () => {
                     <th className="pb-3 text-center">Acción</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-700">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                   {orderItems.length === 0 ? (
                     <tr>
                       <td
@@ -473,12 +484,15 @@ const ProveedoresScreen = () => {
                     </tr>
                   ) : (
                     orderItems.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-slate-700/20">
+                      <tr
+                        key={idx}
+                        className="hover:bg-slate-50 dark:hover:bg-slate-700/20"
+                      >
                         <td className="py-3 pl-2">
-                          <div className="font-medium text-white">
+                          <div className="font-medium text-slate-900 dark:text-white">
                             {item.product.name}
                           </div>
-                          <div className="text-xs text-slate-500 font-mono">
+                          <div className="text-xs text-slate-500 dark:text-slate-500 font-mono">
                             {item.product.barcode}
                           </div>
                         </td>
@@ -487,8 +501,8 @@ const ProveedoresScreen = () => {
                             className={`text-xs font-bold px-2 py-1 rounded ${
                               item.product.stock_quantity <=
                               item.product.min_stock
-                                ? "text-red-400 bg-red-900/20"
-                                : "text-slate-400 bg-slate-800"
+                                ? "text-red-500 bg-red-100 dark:text-red-400 dark:bg-red-900/20"
+                                : "text-slate-500 bg-slate-100 dark:text-slate-400 dark:bg-slate-800"
                             }`}
                           >
                             {item.product.stock_quantity}
@@ -498,7 +512,7 @@ const ProveedoresScreen = () => {
                           <input
                             type="number"
                             min="1"
-                            className="bg-slate-900 border border-slate-600 rounded w-20 text-center py-1 outline-none focus:border-blue-500 font-bold text-white"
+                            className="bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded w-20 text-center py-1 outline-none focus:border-blue-500 font-bold text-slate-900 dark:text-white"
                             value={item.quantity}
                             onChange={(e) =>
                               handleUpdateQuantity(idx, e.target.value)
@@ -508,7 +522,7 @@ const ProveedoresScreen = () => {
                         <td className="py-3 text-center">
                           <button
                             onClick={() => handleRemoveItem(idx)}
-                            className="text-slate-500 hover:text-red-400 transition"
+                            className="text-slate-400 hover:text-red-500 transition"
                           >
                             <X size={18} />
                           </button>
@@ -520,10 +534,10 @@ const ProveedoresScreen = () => {
               </table>
             </div>
 
-            <div className="p-6 border-t border-slate-700 bg-slate-900/50 rounded-b-2xl flex justify-between items-center">
-              <div className="text-sm text-slate-400">
+            <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 rounded-b-2xl flex justify-between items-center transition-colors">
+              <div className="text-sm text-slate-500 dark:text-slate-400">
                 Total Items:{" "}
-                <span className="text-white font-bold">
+                <span className="text-slate-900 dark:text-white font-bold">
                   {orderItems.length}
                 </span>
               </div>

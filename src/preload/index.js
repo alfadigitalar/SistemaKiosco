@@ -78,9 +78,26 @@ contextBridge.exposeInMainWorld("api", {
   deleteSupplier: (id) => ipcRenderer.invoke("delete-supplier", id),
 
   // ═══════════════════════════════════════════════════════════
+  // MÉTODOS DE CONFIGURACIÓN
+  // ═══════════════════════════════════════════════════════════
+  getSettings: () => ipcRenderer.invoke("get-settings"),
+  updateSettings: (data) => ipcRenderer.invoke("update-settings", data),
+
+  // ═══════════════════════════════════════════════════════════
   // MÉTODOS DE USUARIO / AUTENTICACIÓN
   // ═══════════════════════════════════════════════════════════
 
   // Iniciar sesión
   loginUser: (credentials) => ipcRenderer.invoke("login-user", credentials),
+
+  // ═══════════════════════════════════════════════════════════
+  // ESCÁNER MÓVIL
+  // ═══════════════════════════════════════════════════════════
+  getServerInfo: () => ipcRenderer.invoke("get-server-info"),
+  onMobileScan: (callback) => {
+    const listener = (event, code) => callback(code);
+    ipcRenderer.on("mobile-scan", listener);
+    // Retornar función de limpieza
+    return () => ipcRenderer.removeListener("mobile-scan", listener);
+  },
 });

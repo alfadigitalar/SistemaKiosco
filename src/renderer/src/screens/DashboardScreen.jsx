@@ -29,43 +29,51 @@ const DashboardScreen = () => {
     return <div className="p-8 text-white">Cargando Dashboard...</div>;
 
   return (
-    <div className="p-6 h-full flex flex-col gap-6 bg-slate-900 overflow-y-auto">
-      <h1 className="text-3xl font-bold text-white mb-2">Resumen General</h1>
+    <div className="p-6 h-full flex flex-col gap-6 bg-slate-50 dark:bg-slate-900 overflow-y-auto text-slate-900 dark:text-white transition-colors duration-300">
+      <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">
+        Resumen General
+      </h1>
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg">
           <div className="flex justify-between items-center mb-4">
-            <div className="p-3 bg-blue-900/30 rounded-lg text-blue-400">
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
               <DollarSign size={24} />
             </div>
           </div>
-          <p className="text-slate-400 text-sm">Ventas Hoy</p>
-          <p className="text-3xl font-bold text-white">
+          <p className="text-slate-500 dark:text-slate-400 text-sm">
+            Ventas Hoy
+          </p>
+          <p className="text-3xl font-bold text-slate-900 dark:text-white">
             ${stats?.totalDay?.toLocaleString()}
           </p>
         </div>
 
-        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg">
           <div className="flex justify-between items-center mb-4">
-            <div className="p-3 bg-purple-900/30 rounded-lg text-purple-400">
+            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400">
               <Calendar size={24} />
             </div>
           </div>
-          <p className="text-slate-400 text-sm">Ventas este Mes</p>
-          <p className="text-3xl font-bold text-white">
+          <p className="text-slate-500 dark:text-slate-400 text-sm">
+            Ventas este Mes
+          </p>
+          <p className="text-3xl font-bold text-slate-900 dark:text-white">
             ${stats?.totalMonth?.toLocaleString()}
           </p>
         </div>
 
-        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg">
           <div className="flex justify-between items-center mb-4">
-            <div className="p-3 bg-red-900/30 rounded-lg text-red-400">
+            <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg text-red-600 dark:text-red-400">
               <AlertTriangle size={24} />
             </div>
           </div>
-          <p className="text-slate-400 text-sm">Stock Bajo</p>
-          <p className="text-3xl font-bold text-white">
+          <p className="text-slate-500 dark:text-slate-400 text-sm">
+            Stock Bajo
+          </p>
+          <p className="text-3xl font-bold text-slate-900 dark:text-white">
             {stats?.lowStockCount}{" "}
             <span className="text-sm font-normal text-slate-500">
               productos
@@ -73,24 +81,28 @@ const DashboardScreen = () => {
           </p>
         </div>
 
-        <div className="bg-gradient-to-br from-emerald-900 to-slate-900 p-6 rounded-2xl border border-emerald-700/50 shadow-lg">
+        <div className="bg-gradient-to-br from-emerald-100 to-slate-100 dark:from-emerald-900 dark:to-slate-900 p-6 rounded-2xl border border-emerald-200 dark:border-emerald-700/50 shadow-lg">
           <div className="flex justify-between items-center mb-4">
-            <div className="p-3 bg-emerald-900/50 rounded-lg text-emerald-400">
+            <div className="p-3 bg-emerald-200 dark:bg-emerald-900/50 rounded-lg text-emerald-600 dark:text-emerald-400">
               <TrendingUp size={24} />
             </div>
           </div>
-          <p className="text-emerald-200 text-sm">Estado General</p>
-          <p className="text-xl font-bold text-white">Operativo</p>
+          <p className="text-emerald-700 dark:text-emerald-200 text-sm">
+            Estado General
+          </p>
+          <p className="text-xl font-bold text-emerald-900 dark:text-white">
+            Operativo
+          </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
         {/* Gráfico Simple de Ventas (Barras usando CSS) */}
-        <div className="lg:col-span-2 bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg flex flex-col">
-          <h2 className="text-xl font-bold text-white mb-6">
+        <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg flex flex-col">
+          <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-6">
             Evolución de Ventas (7 días)
           </h2>
-          <div className="flex-1 flex items-end gap-2 h-64 border-b border-l border-slate-600 p-4">
+          <div className="flex-1 flex items-end gap-2 h-64 border-b border-l border-slate-200 dark:border-slate-600 p-4">
             {stats?.salesChartData?.map((item) => {
               // Normalizar altura (max 100%)
               const maxVal = Math.max(
@@ -111,7 +123,7 @@ const DashboardScreen = () => {
                       ${item.total.toLocaleString()}
                     </div>
                   </div>
-                  <span className="text-xs text-slate-400 rotate-0">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 rotate-0">
                     {new Date(item.date).toLocaleDateString("es-ES", {
                       weekday: "short",
                       day: "numeric",
@@ -129,26 +141,30 @@ const DashboardScreen = () => {
         </div>
 
         {/* Productos Top */}
-        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg overflow-hidden flex flex-col">
-          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <ShoppingBag size={20} className="text-purple-400" /> Top Productos
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg overflow-hidden flex flex-col">
+          <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <ShoppingBag
+              size={20}
+              className="text-purple-600 dark:text-purple-400"
+            />{" "}
+            Top Productos
           </h2>
           <div className="flex-1 overflow-y-auto pr-2">
             <ul className="space-y-3">
               {stats?.topProducts?.map((prod, index) => (
                 <li
                   key={index}
-                  className="flex justify-between items-center p-3 bg-slate-700/30 rounded-lg"
+                  className="flex justify-between items-center p-3 bg-slate-100 dark:bg-slate-700/30 rounded-lg"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="font-bold text-slate-500">
+                    <span className="font-bold text-slate-500 dark:text-slate-500">
                       #{index + 1}
                     </span>
-                    <span className="text-sm font-medium text-slate-200">
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
                       {prod.name}
                     </span>
                   </div>
-                  <span className="text-xs font-bold px-2 py-1 bg-purple-900/30 text-purple-400 rounded-full">
+                  <span className="text-xs font-bold px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full">
                     {prod.total_qty} un.
                   </span>
                 </li>

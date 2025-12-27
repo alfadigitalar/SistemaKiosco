@@ -46,31 +46,35 @@ const LoginScreen = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-900 flex items-center justify-center p-4 transition-colors duration-300">
       <Toaster position="top-right" />
 
-      <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-700">
+      <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700 transition-colors">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Novy POS</h1>
-          <p className="text-slate-400">Sign in to access the terminal</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+            Novy POS
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400">
+            Sign in to access the terminal
+          </p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
           {/* Username Input */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-300 ml-1">
+            <label className="text-sm font-medium text-slate-600 dark:text-slate-300 ml-1">
               Username
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <User className="text-slate-500 h-5 w-5" />
+                <User className="text-slate-400 dark:text-slate-500 h-5 w-5" />
               </div>
               <input
                 type="text"
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                 placeholder="admin"
               />
             </div>
@@ -78,19 +82,19 @@ const LoginScreen = () => {
 
           {/* Password Input */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-300 ml-1">
+            <label className="text-sm font-medium text-slate-600 dark:text-slate-300 ml-1">
               Password
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="text-slate-500 h-5 w-5" />
+                <Lock className="text-slate-400 dark:text-slate-500 h-5 w-5" />
               </div>
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                 placeholder="••••••••"
               />
             </div>

@@ -136,13 +136,15 @@ const CajaScreen = () => {
   // VISTA: CAJA CERRADA
   if (!session) {
     return (
-      <div className="h-full flex items-center justify-center bg-slate-900 p-6">
-        <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl max-w-md w-full border border-slate-700 text-center">
-          <div className="w-20 h-20 bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-400">
+      <div className="h-full flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-6 transition-colors duration-300">
+        <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 dark:border-slate-700 text-center transition-colors">
+          <div className="w-20 h-20 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-400">
             <Archive size={40} />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Caja Cerrada</h1>
-          <p className="text-slate-400 mb-8">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+            Caja Cerrada
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 mb-8">
             Ingrese el monto inicial para comenzar las operaciones del día.
           </p>
 
@@ -156,7 +158,7 @@ const CajaScreen = () => {
                 min="0"
                 step="0.01"
                 placeholder="0.00"
-                className="w-full bg-slate-900 border border-slate-600 rounded-xl py-4 pl-10 pr-4 text-2xl text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl py-4 pl-10 pr-4 text-2xl text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                 value={initialAmount}
                 onChange={(e) => setInitialAmount(e.target.value)}
                 autoFocus
@@ -176,14 +178,15 @@ const CajaScreen = () => {
 
   // VISTA: CAJA ABIERTA
   return (
-    <div className="p-6 h-full flex flex-col gap-6 bg-slate-900 overflow-y-auto">
+    <div className="p-6 h-full flex flex-col gap-6 bg-slate-50 dark:bg-slate-900 overflow-y-auto text-slate-900 dark:text-white transition-colors duration-300">
       {/* Header y Acciones Principales */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-            <Banknote className="text-green-400" /> Control de Caja
+          <h1 className="text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+            <Banknote className="text-green-600 dark:text-green-400" /> Control
+            de Caja
           </h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-slate-500 dark:text-slate-400 mt-1">
             Abierta el {new Date(session.opened_at).toLocaleString()}
           </p>
         </div>
@@ -198,44 +201,44 @@ const CajaScreen = () => {
       {/* Tarjetas de Resumen */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* Inicial */}
-        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
-          <p className="text-slate-400 text-sm font-medium mb-1">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
+          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">
             Monto Inicial
           </p>
-          <p className="text-2xl font-bold text-white">
+          <p className="text-2xl font-bold text-slate-900 dark:text-white">
             ${summary?.initialAmount?.toLocaleString()}
           </p>
         </div>
         {/* Ventas Efectivo */}
-        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
-          <p className="text-slate-400 text-sm font-medium mb-1">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
+          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">
             Ventas (Efectivo)
           </p>
-          <p className="text-2xl font-bold text-green-400">
+          <p className="text-2xl font-bold text-green-600 dark:text-green-400">
             +${summary?.totalSalesCash?.toLocaleString()}
           </p>
         </div>
         {/* Movimientos */}
-        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
-          <p className="text-slate-400 text-sm font-medium mb-1">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
+          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">
             Entradas / Salidas
           </p>
           <div className="flex gap-3 items-baseline">
-            <span className="text-green-400 font-bold">
+            <span className="text-green-600 dark:text-green-400 font-bold">
               +${summary?.totalIn?.toLocaleString()}
             </span>
-            <span className="text-slate-500">/</span>
-            <span className="text-red-400 font-bold">
+            <span className="text-slate-400 dark:text-slate-500">/</span>
+            <span className="text-red-600 dark:text-red-400 font-bold">
               -${summary?.totalOut?.toLocaleString()}
             </span>
           </div>
         </div>
         {/* Total Teórico */}
-        <div className="bg-gradient-to-br from-blue-900 to-slate-900 p-6 rounded-2xl border border-blue-700/50 shadow-xl">
-          <p className="text-blue-200 text-sm font-medium mb-1">
+        <div className="bg-gradient-to-br from-blue-100 to-slate-100 dark:from-blue-900 dark:to-slate-900 p-6 rounded-2xl border border-blue-200 dark:border-blue-700/50 shadow-xl">
+          <p className="text-blue-700 dark:text-blue-200 text-sm font-medium mb-1">
             Total en Caja (Teórico)
           </p>
-          <p className="text-4xl font-black text-white">
+          <p className="text-4xl font-black text-blue-900 dark:text-white">
             ${summary?.finalBalance?.toLocaleString()}
           </p>
         </div>
@@ -243,8 +246,8 @@ const CajaScreen = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
         {/* Formulario de Movimientos */}
-        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 h-fit">
-          <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 h-fit shadow-sm transition-colors">
+          <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
             <DollarSign size={20} /> Registrar Movimiento
           </h2>
           <form onSubmit={handleAddMovement} className="space-y-4">
@@ -255,7 +258,7 @@ const CajaScreen = () => {
                 className={`p-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition ${
                   movementType === "entry"
                     ? "bg-green-600 text-white"
-                    : "bg-slate-700 text-slate-400"
+                    : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
                 }`}
               >
                 <ArrowUpCircle size={18} /> INGRESO
@@ -266,7 +269,7 @@ const CajaScreen = () => {
                 className={`p-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition ${
                   movementType === "withdrawal"
                     ? "bg-red-600 text-white"
-                    : "bg-slate-700 text-slate-400"
+                    : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
                 }`}
               >
                 <ArrowDownCircle size={18} /> RETIRO
@@ -274,27 +277,29 @@ const CajaScreen = () => {
             </div>
 
             <div>
-              <label className="text-xs text-slate-400 block mb-1">Monto</label>
+              <label className="text-xs text-slate-500 dark:text-slate-400 block mb-1">
+                Monto
+              </label>
               <input
                 type="number"
                 min="0"
                 step="0.01"
                 required
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                 value={movementAmount}
                 onChange={(e) => setMovementAmount(e.target.value)}
               />
             </div>
 
             <div>
-              <label className="text-xs text-slate-400 block mb-1">
+              <label className="text-xs text-slate-500 dark:text-slate-400 block mb-1">
                 Descripción
               </label>
               <input
                 type="text"
                 required
                 placeholder="Ej: Compra de hielo, Pago proveedor..."
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                 value={movementDesc}
                 onChange={(e) => setMovementDesc(e.target.value)}
               />
@@ -310,20 +315,20 @@ const CajaScreen = () => {
         </div>
 
         {/* Tabla de Movimientos Recientes */}
-        <div className="lg:col-span-2 bg-slate-800 rounded-2xl border border-slate-700 flex flex-col overflow-hidden">
-          <div className="p-4 border-b border-slate-700">
-            <h2 className="text-lg font-bold text-white">
+        <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden shadow-sm transition-colors">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700">
+            <h2 className="text-lg font-bold text-slate-800 dark:text-white">
               Últimos Movimientos
             </h2>
           </div>
           <div className="flex-1 overflow-y-auto p-2">
             {movements.length === 0 ? (
-              <div className="h-40 flex items-center justify-center text-slate-500">
+              <div className="h-40 flex items-center justify-center text-slate-400 dark:text-slate-500">
                 No hay movimientos registrados
               </div>
             ) : (
               <table className="w-full text-left">
-                <thead className="text-slate-400 text-xs uppercase bg-slate-900/50">
+                <thead className="text-slate-500 dark:text-slate-400 text-xs uppercase bg-slate-50 dark:bg-slate-900/50">
                   <tr>
                     <th className="p-3">Hora</th>
                     <th className="p-3">Tipo</th>
@@ -331,10 +336,13 @@ const CajaScreen = () => {
                     <th className="p-3 text-right">Monto</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-700">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                   {movements.map((mov) => (
-                    <tr key={mov.id} className="hover:bg-slate-700/30">
-                      <td className="p-3 text-slate-400 text-sm font-mono">
+                    <tr
+                      key={mov.id}
+                      className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
+                    >
+                      <td className="p-3 text-slate-500 dark:text-slate-400 text-sm font-mono">
                         {new Date(mov.timestamp).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -342,23 +350,23 @@ const CajaScreen = () => {
                       </td>
                       <td className="p-3">
                         {mov.type === "entry" ? (
-                          <span className="text-green-400 text-xs font-bold px-2 py-1 bg-green-900/30 rounded">
+                          <span className="text-green-600 dark:text-green-400 text-xs font-bold px-2 py-1 bg-green-100 dark:bg-green-900/30 rounded">
                             INGRESO
                           </span>
                         ) : (
-                          <span className="text-red-400 text-xs font-bold px-2 py-1 bg-red-900/30 rounded">
+                          <span className="text-red-600 dark:text-red-400 text-xs font-bold px-2 py-1 bg-red-100 dark:bg-red-900/30 rounded">
                             RETIRO
                           </span>
                         )}
                       </td>
-                      <td className="p-3 text-white text-sm">
+                      <td className="p-3 text-slate-700 dark:text-white text-sm">
                         {mov.description}
                       </td>
                       <td
                         className={`p-3 text-right font-bold text-sm ${
                           mov.type === "entry"
-                            ? "text-green-400"
-                            : "text-red-400"
+                            ? "text-green-600 dark:text-green-400"
+                            : "text-red-600 dark:text-red-400"
                         }`}
                       >
                         {mov.type === "entry" ? "+" : "-"}$

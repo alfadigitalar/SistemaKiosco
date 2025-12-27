@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Novy Scanner</title>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: white;
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+        }
+
+        #reader {
+            width: 100%;
+            max-width: 400px;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .status {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 360px;
+        }
+
+        .connected {
+            background: #15803d;
+            color: #dcfce7;
+        }
+
+        .disconnected {
+            background: #991b1b;
+            color: #fee2e2;
+        }
+
+        .last-scan-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .last-scan-label {
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
+
+        .last-scan-value {
+            font-family: monospace;
+            font-size: 1.5rem;
+            color: #38bdf8;
+            font-weight: bold;
+        }
+
+        button {
+            padding: 16px 32px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            width: 100%;
+            max-width: 360px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+        }
+
+        button:active {
+            transform: scale(0.98);
+            background: #1d4ed8;
+        }
+
+        #debug-log {
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: #ef4444;
+            text-align: left;
+            width: 100%;
+            max-width: 400px;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Novy POS Scanner</h1>
+
+    <div id="status" class="status disconnected">Conectando...</div>
+
+    <div id="reader"></div>
+
+    <div class="last-scan-container">
+        <div class="last-scan-label">Último Código</div>
+        <div id="lastScan" class="last-scan-value">--</div>
+    </div>
+
+    <button id="startButton">Iniciar Cámara</button>
+
+    <div id="debug-log"></div>
+
+    <script>
+        const socket = io();
+        const statusEl = document.getElementById('status');
+        const lastScanEl = document.getElementById('lastScan');
+        const startBtn = document.getElementById('startButton');
+        const debugLogEl = document.getElementById('debug-log');
+        let html5QrCode;
+
+        function logError(msg) {
+            debugLogEl.textContent += `> ${msg}\n`;
+            console.error(msg);
+        }
+
+        // Socket Events
+        socket.on('connect', () => {
+            statusEl.textContent = "Conectado al POS";
+            statusEl.className = "status connected";
+        });
+
+        socket.on('disconnect', () => {
+            statusEl.textContent = "Desconectado";
+            statusEl.className = "status disconnected";
+        });
+
+        socket.on('connect_error', (err) => {
+            logError("Socket Error: " + err.message);
+        });
+
+        let lastScanTimestamp = 0;
+        const SCAN_COOLDOWN_MS = 2500; // 2.5 segundos de espera entre scans
+
+        // Audio Context
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // Función para "desbloquear" el audio en móviles
+        function unlockAudio() {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            // Tocar un silencio breve
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.value = 0;
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.start(0);
+            oscillator.stop(0.1);
+        }
+
+        function beep() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.type = 'sine'; // Tono suave
+            oscillator.frequency.value = 1200;
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+            oscillator.start(now);
+            gainNode.gain.setValueAtTime(1, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+            oscillator.stop(now + 0.15);
+        }
+
+        // Camera Logic
+        function onScanSuccess(decodedText, decodedResult) {
+            const now = Date.now();
+            if (now - lastScanTimestamp < SCAN_COOLDOWN_MS) {
+                console.log("Ignorado por cooldown");
+                return;
+            }
+            lastScanTimestamp = now;
+
+            // Feedback
+            beep();
+            lastScanEl.textContent = "PROCESANDO...";
+            lastScanEl.style.color = "#fbbf24"; // Amber
+
+            // Log
+            logError("Escaneado: " + decodedText);
+
+            // Emit
+            socket.emit('scan', decodedText);
+
+            // Restaurar visualización
+            setTimeout(() => {
+                lastScanEl.textContent = decodedText;
+                lastScanEl.style.color = "#4ade80";
+            }, 600);
+        }
+
+        startBtn.addEventListener('click', async () => {
+            unlockAudio(); // Important: Desbloquear audio aquí
+
+            startBtn.disabled = true;
+            startBtn.innerText = "Iniciando...";
+            logError("Solicitando permisos de cámara...");
+
+            try {
+                // Verificar si es contexto seguro
+                if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+                    logError("ADVERTENCIA: No estás en HTTPS. Algunos navegadores bloquean la cámara.");
+                }
+
+                html5QrCode = new Html5Qrcode("reader");
+
+                // Configuración más permisiva
+                const config = {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 },
+                    aspectRatio: 1.0
+                };
+
+                // Intentar obtener cámaras primero
+                const devices = await Html5Qrcode.getCameras();
+                if (devices && devices.length) {
+                    // Preferir cámara trasera (environment)
+                    const cameraId = devices[0].id; // Default fallback
+                    // Start scanning
+                    await html5QrCode.start(
+                        { facingMode: "environment" },
+                        config,
+                        onScanSuccess
+                    );
+
+                    startBtn.style.display = 'none';
+                    logError("Cámara iniciada correctamente.");
+                } else {
+                    logError("No se detectaron cámaras.");
+                    startBtn.disabled = false;
+                    startBtn.innerText = "Reintentar";
+                }
+
+            } catch (err) {
+                logError("Error CRÍTICO: " + err);
+                startBtn.disabled = false;
+                startBtn.innerText = "Iniciar Cámara";
+
+                if (err.toString().includes("Permission")) {
+                    alert("Por favor permite el acceso a la cámara.");
+                } else if (err.toString().includes("Secure Context")) {
+                    alert("Error: El navegador bloqueó la cámara por no usar HTTPS. Intenta usar Firefox o configura 'Insecure origins treated as secure' en chrome://flags.");
+                }
+            }
+        });
+
+    </script>
+</body>
+
+</html>

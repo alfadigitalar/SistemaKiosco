@@ -68,11 +68,17 @@ export default function PaymentModal({
     return false;
   };
 
-  // Procesar pago
+  const [vueltoFinal, setVueltoFinal] = useState(0); // Para mostrar en el éxito
+
+  // Process payment
   const procesarPago = async () => {
     if (!pagoValido()) return;
 
     setProcesando(true);
+
+    // Snapshot del vuelto antes de que el total cambie (por vaciar carrito)
+    const vueltoCalculado = calcularVuelto();
+    setVueltoFinal(vueltoCalculado);
 
     // Simular pequeño delay para UX
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -84,7 +90,7 @@ export default function PaymentModal({
       montoRecibido: metodo === "efectivo" ? parseFloat(montoRecibido) : null,
       montoEfectivo: metodo === "mixto" ? parseFloat(montoEfectivo) : null,
       montoTarjeta: metodo === "mixto" ? parseFloat(montoTarjeta) : null,
-      vuelto: calcularVuelto(),
+      vuelto: vueltoCalculado,
     };
 
     const resultado = await onConfirm(pagoData);
@@ -98,6 +104,12 @@ export default function PaymentModal({
     } else {
       setProcesando(false);
       alert("Error al procesar la venta: " + resultado.message);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      procesarPago();
     }
   };
 
@@ -131,9 +143,9 @@ export default function PaymentModal({
               <p className="text-slate-400">
                 La transacción se ha completado correctamente.
               </p>
-              {calcularVuelto() > 0 && (
+              {vueltoFinal > 0 && (
                 <p className="text-3xl font-bold text-yellow-400 mt-4">
-                  Vuelto: ${calcularVuelto().toFixed(2)}
+                  Vuelto: ${vueltoFinal.toFixed(2)}
                 </p>
               )}
             </div>
@@ -225,6 +237,7 @@ export default function PaymentModal({
                       type="number"
                       value={montoRecibido}
                       onChange={(e) => setMontoRecibido(e.target.value)}
+                      onKeyDown={handleKeyDown}
                       className="w-full p-3 bg-slate-900 border border-slate-600 rounded-xl text-2xl text-white text-center font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
                       placeholder="0.00"
                       autoFocus
@@ -263,6 +276,7 @@ export default function PaymentModal({
                       type="number"
                       value={montoEfectivo}
                       onChange={(e) => setMontoEfectivo(e.target.value)}
+                      onKeyDown={handleKeyDown}
                       className="w-full p-3 bg-slate-900 border border-slate-600 rounded-xl text-xl text-white text-center font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
                       placeholder="0.00"
                       autoFocus
@@ -276,6 +290,7 @@ export default function PaymentModal({
                       type="number"
                       value={montoTarjeta}
                       onChange={(e) => setMontoTarjeta(e.target.value)}
+                      onKeyDown={handleKeyDown}
                       className="w-full p-3 bg-slate-900 border border-slate-600 rounded-xl text-xl text-white text-center font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="0.00"
                     />
