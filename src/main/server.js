@@ -19,6 +19,11 @@ function getLocalIp() {
     for (const iface of interfaces[name]) {
       // Ignorar interfaces internas y no-IPv4
       if (iface.family === "IPv4" && !iface.internal) {
+        // Ignorar 192.168.56.x (VirtualBox Host-Only default)
+        if (iface.address.startsWith("192.168.56.")) {
+          continue;
+        }
+
         // Ignorar adaptadores virtuales comunes por nombre
         const lowerName = name.toLowerCase();
         if (
@@ -43,8 +48,12 @@ function getLocalIp() {
     }
   }
 
-  // Retornar el primer resultado válido encontrado, o fallback
-  return results.length > 0 ? results[0] : "127.0.0.1";
+  // Si hay resultados, devolver el primero. Si no, fallback.
+  if (results.length > 0) {
+    console.log("IPs detectadas:", results);
+    return results[0];
+  }
+  return "127.0.0.1";
 }
 
 function startServer(mainWindow) {
