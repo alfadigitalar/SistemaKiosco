@@ -13,21 +13,38 @@ const PORT = 3000;
 // Helper para encontrar la IP local correcta
 function getLocalIp() {
   const interfaces = os.networkInterfaces();
+  const results = [];
+
   for (const name of Object.keys(interfaces)) {
     for (const iface of interfaces[name]) {
-      // Saltar interfaces internas y no-IPv4
+      // Ignorar interfaces internas y no-IPv4
       if (iface.family === "IPv4" && !iface.internal) {
-        // Priorizar redes comunes de hogar/oficina (192.168.x.x)
+        // Ignorar adaptadores virtuales comunes por nombre
+        const lowerName = name.toLowerCase();
+        if (
+          lowerName.includes("virtual") ||
+          lowerName.includes("wsl") ||
+          lowerName.includes("docker") ||
+          lowerName.includes("vpn") ||
+          lowerName.includes("vbox")
+        ) {
+          continue;
+        }
+
+        // Priorizar redes domésticas estándar
         if (
           iface.address.startsWith("192.168.") ||
-          iface.address.startsWith("10.")
+          iface.address.startsWith("10.") ||
+          iface.address.startsWith("172.")
         ) {
-          return iface.address;
+          results.push(iface.address);
         }
       }
     }
   }
-  return "127.0.0.1"; // Fallback
+
+  // Retornar el primer resultado válido encontrado, o fallback
+  return results.length > 0 ? results[0] : "127.0.0.1";
 }
 
 function startServer(mainWindow) {
