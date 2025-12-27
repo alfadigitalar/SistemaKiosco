@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Plus, Search, Trash2, Edit, DollarSign, User } from "lucide-react";
 import { toast } from "react-hot-toast";
+import ConfirmationModal from "../components/ConfirmationModal";
 
 const CustomersScreen = () => {
   const [customers, setCustomers] = useState([]);
@@ -11,6 +12,12 @@ const CustomersScreen = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDebtModalOpen, setIsDebtModalOpen] = useState(false);
   const [currentCustomer, setCurrentCustomer] = useState(null);
+
+  // Confirmation Modal State
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [onConfirmAction, setOnConfirmAction] = useState(() => {});
 
   // Form State
   const [formData, setFormData] = useState({
@@ -77,8 +84,12 @@ const CustomersScreen = () => {
     }
   };
 
-  const handleDeleteCustomer = async (id) => {
-    if (window.confirm("¿Seguro que deseas eliminar este cliente?")) {
+  const handleDeleteCustomer = (id) => {
+    setConfirmTitle("Eliminar Cliente");
+    setConfirmMessage(
+      "¿Estás seguro que deseas eliminar este cliente? Esta acción no se puede deshacer."
+    );
+    setOnConfirmAction(() => async () => {
       try {
         await window.api.deleteCustomer(id);
         toast.success("Cliente eliminado");
@@ -86,7 +97,8 @@ const CustomersScreen = () => {
       } catch (error) {
         toast.error("Error al eliminar");
       }
-    }
+    });
+    setIsConfirmOpen(true);
   };
 
   const handleOpenDebtModal = (customer) => {
@@ -282,7 +294,7 @@ const CustomersScreen = () => {
                   <input
                     type="text"
                     className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none"
-                    value={formData.dni}
+                    value={formData.dni || ""}
                     onChange={(e) =>
                       setFormData({ ...formData, dni: e.target.value })
                     }
@@ -295,7 +307,7 @@ const CustomersScreen = () => {
                   <input
                     type="text"
                     className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none"
-                    value={formData.phone}
+                    value={formData.phone || ""}
                     onChange={(e) =>
                       setFormData({ ...formData, phone: e.target.value })
                     }
@@ -386,6 +398,17 @@ const CustomersScreen = () => {
           </div>
         </div>
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={onConfirmAction}
+        title={confirmTitle}
+        message={confirmMessage}
+        isDestructive={true}
+        confirmText="Eliminar"
+      />
     </div>
   );
 };

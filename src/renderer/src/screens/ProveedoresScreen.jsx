@@ -11,9 +11,11 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
+import { useConfig } from "../context/ConfigContext";
 
 const ProveedoresScreen = () => {
+  const { kioskAddress, kioskName } = useConfig();
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]); // Para el pedido
   const [search, setSearch] = useState("");
@@ -117,12 +119,27 @@ const ProveedoresScreen = () => {
   };
 
   const handleLoadLowStock = () => {
+    // Filtrar productos con stock bajo Y que pertenezcan al proveedor seleccionado
     const lowStockItems = products
-      .filter((p) => p.stock_quantity <= p.min_stock)
+      .filter((p) => {
+        console.log(
+          `Checking ${p.name}: stock=${p.stock_quantity}, min=${p.min_stock}, supp=${p.supplier_id}, target=${orderSupplier.id}`
+        );
+        return (
+          p.stock_quantity <= p.min_stock && p.supplier_id == orderSupplier.id
+        );
+      })
       .map((p) => ({
         product: p,
         quantity: Math.max(10, p.min_stock * 2 - p.stock_quantity), // Sugerencia simple
       }));
+
+    if (lowStockItems.length === 0) {
+      toast("No hay productos con stock bajo para este proveedor", {
+        icon: <Truck />,
+      });
+      return;
+    }
 
     // Evitar duplicados si ya estaban agregados
     const newItems = [...orderItems];
@@ -133,7 +150,7 @@ const ProveedoresScreen = () => {
     });
 
     setOrderItems(newItems);
-    toast.success(`${lowStockItems.length} productos con stock bajo agregados`);
+    toast.success(`${lowStockItems.length} productos agregados`);
   };
 
   const handleAddProductToOrder = (product) => {
@@ -157,52 +174,66 @@ const ProveedoresScreen = () => {
   };
 
   // --- PDF EXPORT ---
+  // --- PDF EXPORT ---
   const generatePDF = () => {
+    console.log("Iniciando generación de PDF...");
     if (orderItems.length === 0) return toast.error("La lista está vacía");
 
-    const doc = new jsPDF();
+    try {
+      const doc = new jsPDF();
+      console.log("PDF creado (doc)");
 
-    // Header
-    doc.setFontSize(22);
-    doc.setTextColor(40);
-    doc.text("Orden de Compra", 14, 20);
+      // Header
+      doc.setFontSize(22);
+      doc.setTextColor(40);
+      doc.text("Orden de Compra", 14, 20);
 
-    doc.setFontSize(12);
-    doc.text("Novy Kiosco", 14, 30);
-    doc.text("Dirección: Calle Falsa 123", 14, 35);
-    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 40);
+      doc.setFontSize(12);
+      doc.text(kioskName || "Novy Kiosco", 14, 30);
+      doc.text(`Dirección: ${kioskAddress}`, 14, 35);
+      doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 40);
 
-    // Datos Proveedor
-    doc.setFontSize(14);
-    doc.setTextColor(0, 0, 0); // Black
-    doc.text(`Proveedor: ${orderSupplier.name}`, 14, 55);
-    doc.setFontSize(10);
-    doc.text(`Contacto: ${orderSupplier.contact_name || "-"}`, 14, 60);
-    doc.text(`Email: ${orderSupplier.email || "-"}`, 14, 65);
+      // Datos Proveedor
+      doc.setFontSize(14);
+      doc.setTextColor(0, 0, 0); // Black
+      doc.text(`Proveedor: ${orderSupplier.name}`, 14, 55);
+      doc.setFontSize(10);
+      doc.text(`Contacto: ${orderSupplier.contact_name || "-"}`, 14, 60);
+      doc.text(`Email: ${orderSupplier.email || "-"}`, 14, 65);
 
-    // Tabla
-    const tableColumn = ["Código", "Producto", "Cant. Solicitada"];
-    const tableRows = [];
+      // Tabla
+      const tableColumn = ["Código", "Producto", "Cant. Solicitada"];
+      const tableRows = [];
 
-    orderItems.forEach((item) => {
-      const row = [item.product.barcode, item.product.name, item.quantity];
-      tableRows.push(row);
-    });
+      orderItems.forEach((item) => {
+        const row = [item.product.barcode, item.product.name, item.quantity];
+        tableRows.push(row);
+      });
 
-    doc.autoTable({
-      head: [tableColumn],
-      body: tableRows,
-      startY: 75,
-      theme: "grid",
-      headStyles: { fillColor: [75, 85, 99] }, // Slate-600 like
-    });
+      console.log("Filas preparadas:", tableRows);
 
-    doc.save(
-      `Pedido_${orderSupplier.name}_${
-        new Date().toISOString().split("T")[0]
-      }.pdf`
-    );
-    toast.success("PDF descargado correctamente");
+      // Usar la función importada directamente
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: 75,
+        theme: "grid",
+        headStyles: { fillColor: [75, 85, 99] }, // Slate-600 like
+      });
+
+      console.log("Tabla generada.");
+
+      doc.save(
+        `Pedido_${orderSupplier.name}_${
+          new Date().toISOString().split("T")[0]
+        }.pdf`
+      );
+      console.log("Guardado solicitado.");
+      toast.success("PDF descargado correctamente");
+    } catch (error) {
+      console.error("Error al generar PDF:", error);
+      toast.error("Error al generar PDF: " + error.message);
+    }
   };
 
   const filteredSuppliers = suppliers.filter((s) =>
@@ -213,7 +244,13 @@ const ProveedoresScreen = () => {
     .filter(
       (p) =>
         p.name.toLowerCase().includes(productSearch.toLowerCase()) &&
-        !orderItems.find((i) => i.product.id === p.id)
+        !orderItems.find((i) => i.product.id === p.id) &&
+        // Opcional: mostrar solo productos del proveedor o todos?
+        // El usuario dijo "pediriamos tales productos que para un proveedor especifico"
+        // Vamos a priorizar: si busco, busco en todos, pero visualmente marco los del proveedor?
+        // O mejor: Filtro estricto por ahora para facilitar "el pedido del proveedor"
+        // Si no tiene proveedor asignado, ¿lo mostramos? Asumamos filtro estricto por proveedor.
+        p.supplier_id === orderSupplier?.id
     )
     .slice(0, 5); // Solo mostrar 5 sugerencias
 
@@ -231,7 +268,7 @@ const ProveedoresScreen = () => {
         </div>
         <button
           onClick={() => handleOpenModal()}
-          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+          className="bg-purple-600 hover:bg-purple-700 active:scale-95 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all shadow-sm"
         >
           <Plus size={20} />
           Nuevo Proveedor

@@ -7,6 +7,7 @@ export const useConfig = () => useContext(ConfigContext);
 
 export const ConfigProvider = ({ children }) => {
   const [kioskName, setKioskName] = useState("Kiosco System");
+  const [kioskAddress, setKioskAddress] = useState("Dirección no configurada");
   const [themeColor, setThemeColor] = useState("blue");
   const [themeMode, setThemeMode] = useState("dark"); // 'light' | 'dark'
   const [loading, setLoading] = useState(true);
@@ -20,6 +21,7 @@ export const ConfigProvider = ({ children }) => {
       if (window.api && window.api.getSettings) {
         const settings = await window.api.getSettings();
         if (settings.kiosk_name) setKioskName(settings.kiosk_name);
+        if (settings.kiosk_address) setKioskAddress(settings.kiosk_address);
         if (settings.theme_color) setThemeColor(settings.theme_color);
         if (settings.theme_mode) setThemeMode(settings.theme_mode);
       }
@@ -48,6 +50,7 @@ export const ConfigProvider = ({ children }) => {
     try {
       await window.api.updateSettings(newSettings);
       if (newSettings.kiosk_name) setKioskName(newSettings.kiosk_name);
+      if (newSettings.kiosk_address) setKioskAddress(newSettings.kiosk_address);
       if (newSettings.theme_color) setThemeColor(newSettings.theme_color);
       if (newSettings.theme_mode) setThemeMode(newSettings.theme_mode);
       // Toast handled by component or here, let's return true for component handling
@@ -99,6 +102,7 @@ export const ConfigProvider = ({ children }) => {
     <ConfigContext.Provider
       value={{
         kioskName,
+        kioskAddress,
         themeColor,
         themeMode,
         updateConfig,

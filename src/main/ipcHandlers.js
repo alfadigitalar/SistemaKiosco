@@ -62,11 +62,12 @@ function registerIpcHandlers() {
         stock_quantity,
         min_stock,
         category_id,
+        supplier_id,
       } = product;
 
       await run(
-        `INSERT INTO products (barcode, name, cost_price, sale_price, stock_quantity, min_stock, category_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO products (barcode, name, cost_price, sale_price, stock_quantity, min_stock, category_id, supplier_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           barcode,
           name,
@@ -75,6 +76,7 @@ function registerIpcHandlers() {
           stock_quantity,
           min_stock,
           category_id,
+          supplier_id,
         ]
       );
 
@@ -101,11 +103,12 @@ function registerIpcHandlers() {
         stock_quantity,
         min_stock,
         category_id,
+        supplier_id,
       } = product;
 
       await run(
         `UPDATE products 
-         SET barcode=?, name=?, cost_price=?, sale_price=?, stock_quantity=?, min_stock=?, category_id=? 
+         SET barcode=?, name=?, cost_price=?, sale_price=?, stock_quantity=?, min_stock=?, category_id=?, supplier_id=?
          WHERE id=?`,
         [
           barcode,
@@ -115,6 +118,7 @@ function registerIpcHandlers() {
           stock_quantity,
           min_stock,
           category_id,
+          supplier_id,
           id,
         ]
       );

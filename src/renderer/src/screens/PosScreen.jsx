@@ -49,7 +49,13 @@ export default function PosScreen() {
 
     // Cargar clientes
     const loadCustomers = async () => {
-      // ... code truncated ...
+      try {
+        const data = await window.api.getCustomers();
+        setClientes(data);
+      } catch (error) {
+        console.error("Error al cargar clientes:", error);
+        toast.error("Error al cargar lista de clientes");
+      }
     };
     loadCustomers();
     // Se eliminó el listener de click global que robaba el foco
@@ -104,7 +110,7 @@ export default function PosScreen() {
           agregarAlCarrito(producto);
           toast.success(producto.name);
           // Reproducir sonido DESKTOP también por si acaso
-          playLowStockSound();
+          // playLowStockSound(); // REMOVED: User prefers custom mobile sound only
         } else {
           toast.error("Producto no encontrado");
         }

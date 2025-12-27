@@ -1,24 +1,34 @@
 import React, { useState, useEffect } from "react";
 import { useConfig } from "../context/ConfigContext";
 import { Save, Monitor, Palette, Sun, Moon } from "lucide-react";
+import { toast } from "react-hot-toast";
 
 const ConfiguracionScreen = () => {
-  const { kioskName, themeColor, themeMode, updateConfig, getThemeClasses } =
-    useConfig();
+  const {
+    kioskName,
+    kioskAddress,
+    themeColor,
+    themeMode,
+    updateConfig,
+    getThemeClasses,
+  } = useConfig();
 
   const [name, setName] = useState(kioskName);
+  const [address, setAddress] = useState(kioskAddress);
   const [selectedColor, setSelectedColor] = useState(themeColor);
   const [selectedMode, setSelectedMode] = useState(themeMode);
 
   useEffect(() => {
     setName(kioskName);
+    setAddress(kioskAddress);
     setSelectedColor(themeColor);
     setSelectedMode(themeMode);
-  }, [kioskName, themeColor, themeMode]);
+  }, [kioskName, kioskAddress, themeColor, themeMode]);
 
   const handleSave = async () => {
     const promise = updateConfig({
       kiosk_name: name,
+      kiosk_address: address,
       theme_color: selectedColor,
       theme_mode: selectedMode,
     });
@@ -72,6 +82,22 @@ const ConfiguracionScreen = () => {
               />
               <p className="text-xs text-slate-500 mt-2">
                 Este nombre se mostrará en el menú lateral y reportes.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm text-slate-400 mb-2">
+                Dirección
+              </label>
+              <input
+                type="text"
+                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Ej: Av. Siempre Viva 742"
+              />
+              <p className="text-xs text-slate-500 mt-2">
+                Esta dirección aparecerá en los pedidos y tickets.
               </p>
             </div>
           </div>
@@ -149,7 +175,7 @@ const ConfiguracionScreen = () => {
         <button
           onClick={handleSave}
           className={`
-             w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg flex items-center justify-center gap-2 transition-all
+             w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] active:scale-95
              ${theme.bg} ${theme.hover}
            `}
         >

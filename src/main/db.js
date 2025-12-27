@@ -67,6 +67,16 @@ async function initDatabase() {
       );
     `);
 
+    // MIGRATION: Add supplier_id to products if not exists
+    try {
+      // Check if column exists (naive check or just try alter table and ignore error)
+      // SQLite doesn't support IF NOT EXISTS in ADD COLUMN directly in all versions,
+      // but we can try catch it.
+      db.run("ALTER TABLE products ADD COLUMN supplier_id INTEGER");
+    } catch (e) {
+      // Column likely exists
+    }
+
     // MIGRACIÓN MANUAL: Tabla Settings (Fase 10)
     db.run(`
       CREATE TABLE IF NOT EXISTS settings (

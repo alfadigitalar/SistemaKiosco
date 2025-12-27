@@ -27,13 +27,53 @@
             margin-bottom: 10px;
         }
 
-        #reader {
+        #scanner-wrapper {
+            position: relative;
             width: 100%;
             max-width: 400px;
-            background: #000;
+            margin-bottom: 20px;
             border-radius: 12px;
             overflow: hidden;
-            margin-bottom: 20px;
+            background: #000;
+        }
+
+        #reader {
+            width: 100%;
+        }
+
+        #overlayFlash {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: rgba(0, 0, 0, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            color: white;
+            font-size: 24px;
+            display: none;
+            /* Hidden by default */
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 10;
+            padding: 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(4px);
+            transition: all 0.2s ease;
+        }
+
+        #overlayFlash:active {
+            transform: scale(0.95);
+        }
+
+        #overlayFlash.active {
+            background-color: rgba(245, 158, 11, 0.9);
+            /* Amber */
+            border-color: #fbbf24;
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.5);
+            color: black;
         }
 
         .status {
@@ -73,7 +113,7 @@
             font-weight: bold;
         }
 
-        button {
+        button.primary-btn {
             padding: 16px 32px;
             font-size: 1.1rem;
             font-weight: bold;
@@ -87,7 +127,7 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
         }
 
-        button:active {
+        button.primary-btn:active {
             transform: scale(0.98);
             background: #1d4ed8;
         }
@@ -112,14 +152,17 @@
 
     <div id="status" class="status disconnected">Conectando...</div>
 
-    <div id="reader"></div>
+    <div id="scanner-wrapper">
+        <div id="reader"></div>
+        <button id="overlayFlash" title="Toggle Flash">⚡</button>
+    </div>
 
     <div class="last-scan-container">
         <div class="last-scan-label">Último Código</div>
         <div id="lastScan" class="last-scan-value">--</div>
     </div>
 
-    <button id="startButton">Iniciar Cámara</button>
+    <button id="startButton" class="primary-btn">Iniciar Cámara</button>
 
     <div id="debug-log"></div>
 
@@ -128,6 +171,7 @@
         const statusEl = document.getElementById('status');
         const lastScanEl = document.getElementById('lastScan');
         const startBtn = document.getElementById('startButton');
+        const flashBtn = document.getElementById('overlayFlash');
         const debugLogEl = document.getElementById('debug-log');
         let html5QrCode;
 
@@ -154,39 +198,20 @@
         let lastScanTimestamp = 0;
         const SCAN_COOLDOWN_MS = 2500; // 2.5 segundos de espera entre scans
 
-        // Audio Context
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // Custom Audio File
+        const beepSound = new Audio('beep.mp3');
 
         // Función para "desbloquear" el audio en móviles
         function unlockAudio() {
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
-            // Tocar un silencio breve
-            const oscillator = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-            gainNode.gain.value = 0;
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            oscillator.start(0);
-            oscillator.stop(0.1);
+            beepSound.play().then(() => {
+                beepSound.pause();
+                beepSound.currentTime = 0;
+            }).catch(e => console.log("Audio unlock attempted", e));
         }
 
         function beep() {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            const oscillator = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-
-            oscillator.type = 'sine'; // Tono suave
-            oscillator.frequency.value = 1200;
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-
-            const now = audioCtx.currentTime;
-            oscillator.start(now);
-            gainNode.gain.setValueAtTime(1, now);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-            oscillator.stop(now + 0.15);
+            beepSound.currentTime = 0;
+            beepSound.play().catch(e => console.error("Beep error:", e));
         }
 
         // Camera Logic
@@ -252,6 +277,40 @@
 
                     startBtn.style.display = 'none';
                     logError("Cámara iniciada correctamente.");
+
+                    // Check for Torch/Flash support
+                    // Wait a bit for camera to fully initialize capabilities
+                    setTimeout(() => {
+                        try {
+                            const capabilities = html5QrCode.getRunningTrackCameraCapabilities();
+                            if (capabilities.torch) {
+                                flashBtn.style.display = 'flex'; // Show flex to center icon
+                                let isFlashOn = false;
+
+                                flashBtn.addEventListener('click', () => {
+                                    isFlashOn = !isFlashOn;
+                                    html5QrCode.applyVideoConstraints({
+                                        advanced: [{ torch: isFlashOn }]
+                                    })
+                                        .then(() => {
+                                            if (isFlashOn) {
+                                                flashBtn.classList.add('active');
+                                            } else {
+                                                flashBtn.classList.remove('active');
+                                            }
+                                        })
+                                        .catch(err => {
+                                            logError("Error Flash: " + err);
+                                        });
+                                });
+                            } else {
+                                logError("Este dispositivo no reporta soporte de linterna (torch).");
+                            }
+                        } catch (e) {
+                            logError("No se pudo verificar soporte de Flash: " + e);
+                        }
+                    }, 500);
+
                 } else {
                     logError("No se detectaron cámaras.");
                     startBtn.disabled = false;

@@ -13,6 +13,7 @@ import { toast } from "react-hot-toast";
 
 const InventarioScreen = () => {
   const [products, setProducts] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -29,6 +30,7 @@ const InventarioScreen = () => {
     stock_quantity: "",
     min_stock: "5",
     category_id: null,
+    supplier_id: "",
   });
 
   const barcodeInputRef = useRef(null);
@@ -37,10 +39,14 @@ const InventarioScreen = () => {
     setLoading(true);
     try {
       // Usamos getProducts que ya está expuesto
-      const data = await window.api.getProducts();
-      setProducts(data);
+      const [productsData, suppliersData] = await Promise.all([
+        window.api.getProducts(),
+        window.api.getSuppliers(),
+      ]);
+      setProducts(productsData);
+      setSuppliers(suppliersData);
     } catch (error) {
-      toast.error("Error al cargar productos");
+      toast.error("Error al cargar datos");
     } finally {
       setLoading(false);
     }
@@ -48,6 +54,52 @@ const InventarioScreen = () => {
 
   useEffect(() => {
     fetchProducts();
+  }, []);
+
+  // Ref para el estado del modal (para usar dentro del listener sin dependencias)
+  const isModalOpenRef = useRef(isModalOpen);
+  useEffect(() => {
+    isModalOpenRef.current = isModalOpen;
+  }, [isModalOpen]);
+
+  // Ref para debounce
+  const lastScanTimeRef = useRef(0);
+
+  // Listener de Escáner Móvil
+  useEffect(() => {
+    const removeListener = window.api.onMobileScan((code) => {
+      const now = Date.now();
+      if (now - lastScanTimeRef.current < 2000) return;
+      lastScanTimeRef.current = now;
+
+      // Lógica:
+      // Si el modal está CERRADO -> Abrir modal de "Nuevo Producto" con el código.
+      // Si el modal está ABIERTO -> Solo inyectar el código en el campo.
+
+      if (!isModalOpenRef.current) {
+        setCurrentProduct(null); // Modo Crear
+        setFormData({
+          barcode: code,
+          name: "",
+          cost_price: "",
+          sale_price: "",
+          stock_quantity: "",
+          min_stock: "5",
+          category_id: null,
+          supplier_id: "",
+        });
+        setIsModalOpen(true);
+        // Enfocar input (delay para render)
+        setTimeout(() => barcodeInputRef.current?.focus(), 100);
+        toast.success("Nuevo producto detectado", { icon: <Barcode /> });
+      } else {
+        // Solo actualizar campo
+        setFormData((prev) => ({ ...prev, barcode: code }));
+        toast.success("Código actualizado");
+      }
+    });
+
+    return () => removeListener();
   }, []);
 
   const handleOpenModal = (product = null) => {
@@ -61,6 +113,7 @@ const InventarioScreen = () => {
         stock_quantity: product.stock_quantity,
         min_stock: product.min_stock,
         category_id: product.category_id,
+        supplier_id: product.supplier_id || "",
       });
     } else {
       setCurrentProduct(null);
@@ -72,6 +125,7 @@ const InventarioScreen = () => {
         stock_quantity: "",
         min_stock: "5",
         category_id: null,
+        supplier_id: "",
       });
     }
     setIsModalOpen(true);
@@ -90,6 +144,9 @@ const InventarioScreen = () => {
         sale_price: parseFloat(formData.sale_price) || 0,
         stock_quantity: parseInt(formData.stock_quantity) || 0,
         min_stock: parseInt(formData.min_stock) || 0,
+        supplier_id: formData.supplier_id
+          ? parseInt(formData.supplier_id)
+          : null,
       };
 
       if (currentProduct) {
@@ -154,7 +211,7 @@ const InventarioScreen = () => {
         </div>
         <button
           onClick={() => handleOpenModal()}
-          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+          className="bg-purple-600 hover:bg-purple-700 active:scale-95 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all shadow-sm"
         >
           <Plus size={20} />
           Nuevo Producto
@@ -324,6 +381,26 @@ const InventarioScreen = () => {
                     />
                     <Barcode className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 w-5 h-5" />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">
+                    Proveedor
+                  </label>
+                  <select
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none transition-colors"
+                    value={formData.supplier_id}
+                    onChange={(e) =>
+                      setFormData({ ...formData, supplier_id: e.target.value })
+                    }
+                  >
+                    <option value="">Seleccionar Proveedor</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
