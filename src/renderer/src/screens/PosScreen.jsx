@@ -79,9 +79,20 @@ export default function PosScreen() {
     }
   };
 
+  // Ref para debounce (evitar múltiples scans)
+  const lastScanTimeRef = useRef(0);
+
   // Escuchar scans desde el móvil
   useEffect(() => {
     const removeListener = window.api.onMobileScan((code) => {
+      const now = Date.now();
+      // Si pasaron menos de 2 segundos desde el último procesado, ignorar
+      if (now - lastScanTimeRef.current < 2000) {
+        console.log("Scan ignorado (Debounce Frontend):", code);
+        return;
+      }
+      lastScanTimeRef.current = now;
+
       toast.success(`Producto escaneado`, {
         icon: <Smartphone size={18} className="text-blue-500" />,
         duration: 1000,
@@ -581,11 +592,11 @@ export default function PosScreen() {
                 Total a Pagar
               </span>
             </div>
-            <div className="text-right text-5xl font-black text-slate-900 dark:text-green-400 tracking-tighter drop-shadow-sm">
-              <span className="text-green-600 dark:text-green-400">
-                ${total.toFixed(2)}
-              </span>
-            </div>
+          </div>
+          <div className="text-right text-5xl font-black text-slate-900 dark:text-green-400 tracking-tighter drop-shadow-sm">
+            <span className="text-green-600 dark:text-green-400">
+              ${total.toFixed(2)}
+            </span>
           </div>
 
           {/* Botones de Acción */}
