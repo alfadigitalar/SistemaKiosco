@@ -62,6 +62,7 @@
 - [x] Búsqueda automática al presionar Enter
 - [x] Carrito: agregar, eliminar, calcular subtotales
 - [x] Diseño Touch-Friendly (botones grandes)
+- [x] Fix: Z-Index de Toasts para visibilidad
 
 ## Fase 4: Procesar Pago ✅ COMPLETO
 
@@ -78,6 +79,8 @@
 - [x] Campo `current_debt` actualizable
 - [x] Función "Pago a Cuenta" (decrementar deuda)
 - [x] Vista de deudas por cliente
+- [x] Fix: Bug de input DNI/Teléfono bloqueado
+- [x] Fix: Selector de cliente en POS (debounce)
 
 ## Fase 6: Inventario (CRUD Productos) ✅ COMPLETO
 
@@ -86,6 +89,7 @@
 - [x] Indicador visual (Rojo si `stock <= min_stock`)
 - [x] Formulario crear/editar productos
 - [x] Validación de código de barras único
+- [x] Escaneo móvil directo para alta de productos
 
 ## Fase 7: Control de Caja ✅ COMPLETO
 
@@ -102,19 +106,6 @@
 - [x] Alertas de stock bajo
 - [x] Historial de ventas con filtros
 
----
-
-## 🚀 Estado Actual
-
-| Fase | Descripción             | Estado |
-| ---- | ----------------------- | ------ |
-| 1    | Backend + SQLite        | ✅     |
-| 2    | UI + Login + Layout     | ✅     |
-| 3    | POS + Escáner + Carrito | ✅     |
-| 4    | Modal de Pago + Guardar | ✅     |
-| 5    | Clientes y Fiados       | ✅     |
-| 6    | Inventario CRUD         | ✅     |
-
 ## Fase 9: Proveedores y Pedidos (PDF) ✅ COMPLETO
 
 - [x] Backend: Tabla `suppliers` y Handlers CRUD
@@ -125,8 +116,6 @@
   - [x] Exportación a PDF (jsPDF)
 - [x] Integración en `App.jsx`
 
----
-
 ## Fase 10: Configuración y Personalización ✅ COMPLETO
 
 - [x] Fix: Eliminado borde blanco y flash (bg-slate-900)
@@ -134,6 +123,21 @@
 - [x] Frontend: `ConfigContext` para identidad global
 - [x] Frontend: Pantalla de Configuración (Nombre y Color)
 - [x] Integración: Tema dinámico en Sidebar y Botones
+
+## Fase 11: Escáner Móvil y Conectividad ✅ COMPLETO
+
+- [x] Servidor local (Express + Socket.io) en puerto 3000
+- [x] Web App de escáner (`html5-qrcode`)
+- [x] Vinculación por QR desde el POS
+- [x] Soporte para **Linterna/Flash** en escáner móvil (Overlay UI)
+- [x] **Detección inteligente de IP Local** (filtro de VirtualBox/VPN)
+- [x] Feedback sonoro y vibración
+
+## Fase 12: Mejoras de UI/UX ✅ COMPLETO
+
+- [x] `ConfirmationModal`: Reemplazo de `window.confirm` nativos
+- [x] Animaciones: Efecto `active:scale-95` en botones principales
+- [x] Toast Notifications visibles (Z-Index fix)
 
 ---
 
@@ -151,5 +155,7 @@
 | 8    | Dashboard/Reportes      | ✅     |
 | 9    | Proveedores y Pedidos   | ✅     |
 | 10   | Configuración y Tema    | ✅     |
+| 11   | Escáner Móvil + Flash   | ✅     |
+| 12   | UI Polish + IP Fix      | ✅     |
 
 **Repositorio:** https://github.com/alfadigitalar/SistemaKiosco

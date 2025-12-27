@@ -1,3 +1,7 @@
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import ConfirmationModal from "../components/ConfirmationModal";
+import { useConfig } from "../context/ConfigContext";
 import React, { useState, useEffect } from "react";
 import {
   DollarSign,
@@ -10,10 +14,15 @@ import {
 import { toast } from "react-hot-toast";
 
 const CajaScreen = () => {
+  const { kioskName, kioskAddress } = useConfig();
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
   const [summary, setSummary] = useState(null);
   const [movements, setMovements] = useState([]);
+
+  // Confirmation Modal State
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [pendingClose, setPendingClose] = useState(false);
 
   // Estados de carga de datos auxiliares
   const [refreshKey, setRefreshKey] = useState(0);
@@ -27,29 +36,121 @@ const CajaScreen = () => {
   // Cargar datos al montar y al refrescar
   useEffect(() => {
     const fetchData = async () => {
+      console.log("CajaScreen: Iniciando fetchData...");
       setLoading(true);
       try {
+        console.log("CajaScreen: Llamando a getCurrentSession...");
         const currentSession = await window.api.getCurrentSession();
+        console.log("CajaScreen: currentSession recibido:", currentSession);
+
         setSession(currentSession);
 
         if (currentSession) {
+          console.log("CajaScreen: Llamando a getCashSummary...");
           const sum = await window.api.getCashSummary(currentSession.id);
+          console.log("CajaScreen: summary recibido:", sum);
           setSummary(sum);
+
+          console.log("CajaScreen: Llamando a getMovements...");
           const movs = await window.api.getMovements(20);
+          console.log("CajaScreen: movements recibidos:", movs);
           setMovements(movs);
+        } else {
+          console.log("CajaScreen: No hay sesión activa.");
         }
       } catch (error) {
-        console.error(error);
-        toast.error("Error al cargar datos de caja");
+        console.error("CajaScreen Error:", error);
+        toast.error("Error al cargar datos de caja: " + error.message);
       } finally {
+        console.log("CajaScreen: Finalizando loading...");
         setLoading(false);
       }
     };
     fetchData();
   }, [refreshKey]);
 
+  // PDF Report Generation
+  const generateCloseReportPDF = (
+    closedSession,
+    finalSummary,
+    sessionMovements
+  ) => {
+    try {
+      const doc = new jsPDF();
+
+      // Header
+      doc.setFontSize(20);
+      doc.setTextColor(40);
+      doc.text("Reporte de Cierre de Caja", 14, 20);
+
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(kioskName || "Novy Kiosco", 14, 28);
+      doc.text(`Dirección: ${kioskAddress || "-"}`, 14, 33);
+      doc.text(
+        `Fecha: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
+        14,
+        38
+      );
+
+      // Resumen Principal
+      doc.setFontSize(14);
+      doc.setTextColor(0);
+      doc.text("Resumen Financiero", 14, 50);
+
+      const summaryData = [
+        ["Monto Inicial", `$${finalSummary.initialAmount?.toLocaleString()}`],
+        [
+          "Ventas (Efectivo)",
+          `$${finalSummary.totalSalesCash?.toLocaleString()}`,
+        ],
+        ["Total Entradas", `$${finalSummary.totalIn?.toLocaleString()}`],
+        ["Total Salidas", `-$${finalSummary.totalOut?.toLocaleString()}`],
+        ["TOTAL EN CAJA", `$${finalSummary.finalBalance?.toLocaleString()}`],
+      ];
+
+      autoTable(doc, {
+        startY: 55,
+        head: [["Concepto", "Monto"]],
+        body: summaryData,
+        theme: "grid",
+        headStyles: { fillColor: [30, 41, 59] }, // Slate-800
+        columnStyles: { 1: { halign: "right", fontStyle: "bold" } },
+      });
+
+      // Tabla de Movimientos
+      if (sessionMovements && sessionMovements.length > 0) {
+        const finalY = doc.lastAutoTable.finalY + 15;
+        doc.text("Detalle de Movimientos", 14, finalY);
+
+        const movRows = sessionMovements.map((m) => [
+          new Date(m.timestamp).toLocaleTimeString(),
+          m.type === "entry" ? "INGRESO" : "RETIRO",
+          m.description,
+          `$${m.amount.toLocaleString()}`,
+        ]);
+
+        autoTable(doc, {
+          startY: finalY + 5,
+          head: [["Hora", "Tipo", "Descripción", "Monto"]],
+          body: movRows,
+          theme: "striped",
+          headStyles: { fillColor: [71, 85, 105] }, // Slate-600
+          columnStyles: { 3: { halign: "right" } },
+        });
+      }
+
+      doc.save(`Cierre_Caja_${new Date().toISOString().split("T")[0]}.pdf`);
+      toast.success("Reporte PDF generado");
+    } catch (error) {
+      console.error("Error PDF:", error);
+      toast.error("Error al generar PDF");
+    }
+  };
+
   // Abrir Caja
   const handleOpenBox = async (e) => {
+    // ... (Existing logic) ...
     e.preventDefault();
     if (!initialAmount || initialAmount < 0)
       return toast.error("Monto inválido");
@@ -72,17 +173,20 @@ const CajaScreen = () => {
     }
   };
 
-  // Cerrar Caja
-  const handleCloseBox = async () => {
+  // Solicitar Cierre (Abre Modal)
+  const requestCloseBox = () => {
     if (!session || !summary) return;
-    if (
-      !window.confirm(
-        "¿Seguro que desea cerrar la caja? Esta acción generará el reporte final."
-      )
-    )
-      return;
+    setIsConfirmOpen(true);
+  };
 
+  // Confirmar Cierre (Ejecuta Acción)
+  const confirmCloseBox = async () => {
     try {
+      // Capturar estado actual para el reporte antes de borrarlo
+      const closingSession = session;
+      const closingSummary = summary;
+      const closingMovements = movements;
+
       const result = await window.api.closeCashSession({
         sessionId: session.id,
         finalAmount: summary.finalBalance,
@@ -92,6 +196,14 @@ const CajaScreen = () => {
 
       if (result.success) {
         toast.success("Caja cerrada exitosamente");
+
+        // Generar PDF con los datos capturados
+        generateCloseReportPDF(
+          closingSession,
+          closingSummary,
+          closingMovements
+        );
+
         setSession(null);
         setSummary(null);
         setRefreshKey((prev) => prev + 1);
@@ -100,6 +212,8 @@ const CajaScreen = () => {
       }
     } catch (error) {
       toast.error("Error al cerrar caja");
+    } finally {
+      setIsConfirmOpen(false);
     }
   };
 
@@ -191,7 +305,7 @@ const CajaScreen = () => {
           </p>
         </div>
         <button
-          onClick={handleCloseBox}
+          onClick={requestCloseBox}
           className="bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-red-900/20 transition flex items-center gap-2"
         >
           <Archive size={20} /> CERRAR CAJA
@@ -380,6 +494,17 @@ const CajaScreen = () => {
           </div>
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={confirmCloseBox}
+        title="Cerrar Caja"
+        message="¿Seguro que desea cerrar la caja? Esta acción generará el reporte final del saldo y ventas del día."
+        confirmText="Cerrar y Generar Reporte"
+        cancelText="Cancelar"
+        isDestructive={true}
+      />
     </div>
   );
 };

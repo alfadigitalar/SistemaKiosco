@@ -29,6 +29,13 @@ function App() {
           <ErrorBoundary>
             <Toaster
               position="top-right"
+              containerStyle={{
+                top: 40,
+                left: 20,
+                bottom: 20,
+                right: 20,
+                zIndex: 99999,
+              }}
               toastOptions={{
                 style: { background: "#334155", color: "#fff" },
               }}
