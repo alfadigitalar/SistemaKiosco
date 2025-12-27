@@ -6,6 +6,7 @@ import {
 } from "react-router-dom";
 import LoginScreen from "./screens/LoginScreen";
 import PosScreen from "./screens/PosScreen";
+import CustomersScreen from "./screens/CustomersScreen";
 import ErrorBoundary from "./components/ErrorBoundary";
 import MainLayout from "./components/MainLayout";
 
@@ -60,7 +61,7 @@ function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/ventas" element={<PosScreen />} />
               <Route path="/inventario" element={<Inventario />} />
-              <Route path="/clientes" element={<Clientes />} />
+              <Route path="/clientes" element={<CustomersScreen />} />
               <Route path="/proveedores" element={<Proveedores />} />
               <Route path="/historial" element={<Historial />} />
             </Route>

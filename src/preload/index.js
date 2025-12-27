@@ -33,6 +33,17 @@ contextBridge.exposeInMainWorld("api", {
   createSale: (saleData) => ipcRenderer.invoke("create-sale", saleData),
 
   // ═══════════════════════════════════════════════════════════
+  // MÉTODOS DE CLIENTES
+  // ═══════════════════════════════════════════════════════════
+
+  getCustomers: () => ipcRenderer.invoke("get-customers"),
+  createCustomer: (customer) => ipcRenderer.invoke("create-customer", customer),
+  updateCustomer: (customer) => ipcRenderer.invoke("update-customer", customer),
+  deleteCustomer: (id) => ipcRenderer.invoke("delete-customer", id),
+  processDebtPayment: (data) =>
+    ipcRenderer.invoke("process-debt-payment", data),
+
+  // ═══════════════════════════════════════════════════════════
   // MÉTODOS DE USUARIO / AUTENTICACIÓN
   // ═══════════════════════════════════════════════════════════
 

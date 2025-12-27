@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Trash2, ShoppingCart, Search, CreditCard, X } from "lucide-react";
+import {
+  Trash2,
+  ShoppingCart,
+  Search,
+  CreditCard,
+  X,
+  Menu,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 import PaymentModal from "../components/PaymentModal";
 
@@ -20,7 +28,13 @@ export default function PosScreen() {
   const [codigo, setCodigo] = useState("");
   const [loading, setLoading] = useState(false);
   const [modalPagoAbierto, setModalPagoAbierto] = useState(false);
+
+  // Cliente State
+  const [clientes, setClientes] = useState([]);
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
+
   const inputRef = useRef(null);
+  const navigate = useNavigate();
 
   // ═══════════════════════════════════════════════════════════
   // EFECTOS
@@ -31,6 +45,18 @@ export default function PosScreen() {
     const focusInput = () => inputRef.current?.focus();
     focusInput();
     window.addEventListener("click", focusInput);
+
+    // Cargar clientes
+    const loadCustomers = async () => {
+      try {
+        const data = await window.api.getCustomers();
+        setClientes(data);
+      } catch (error) {
+        console.error("Error al cargar clientes", error);
+      }
+    };
+    loadCustomers();
+
     return () => window.removeEventListener("click", focusInput);
   }, []);
 
@@ -127,7 +153,7 @@ export default function PosScreen() {
         total: total,
         paymentMethod: pagoData.metodo,
         userId: 1, // TODO: Obtener del usuario logueado
-        clientId: null, // TODO: Implementar selección de cliente
+        clientId: clienteSeleccionado ? clienteSeleccionado.id : null,
       };
 
       // Enviar al backend
@@ -136,6 +162,7 @@ export default function PosScreen() {
       if (resultado.success) {
         toast.success(`Venta #${resultado.saleId} completada`);
         setCarrito([]); // Limpiar carrito
+        setClienteSeleccionado(null); // Resetear cliente
         return { success: true };
       } else {
         return { success: false, message: resultado.message };
@@ -159,6 +186,7 @@ export default function PosScreen() {
         onClose={() => setModalPagoAbierto(false)}
         total={total}
         onConfirm={procesarPago}
+        clientName={clienteSeleccionado ? clienteSeleccionado.name : null}
       />
 
       {/* ════════════════════════════════════════════════════════ */}
@@ -237,12 +265,44 @@ export default function PosScreen() {
       {/* ════════════════════════════════════════════════════════ */}
       <div className="w-96 flex flex-col gap-4">
         {/* Tarjeta de Usuario / Info */}
-        <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
-          <div className="flex justify-between items-center text-slate-400 text-sm mb-1">
+        <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg space-y-3">
+          <div className="flex justify-between items-center text-slate-400 text-sm">
             <span>Cajero</span>
             <span>{new Date().toLocaleDateString()}</span>
           </div>
-          <div className="font-bold text-lg text-white">Administrador</div>
+          <div className="flex justify-between items-center">
+            <div className="font-bold text-lg text-white">Administrador</div>
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="p-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition"
+              title="Ir al Menú Principal"
+            >
+              <Menu size={20} />
+            </button>
+          </div>
+
+          {/* Selector de Cliente */}
+          <div className="pt-3 border-t border-slate-700">
+            <label className="text-xs text-slate-400 block mb-1">
+              Cliente (Opcional)
+            </label>
+            <select
+              value={clienteSeleccionado ? clienteSeleccionado.id : ""}
+              onChange={(e) => {
+                const clienteId = parseInt(e.target.value);
+                const cliente = clientes.find((c) => c.id === clienteId);
+                setClienteSeleccionado(cliente || null);
+              }}
+              className="w-full p-2 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="">-- Cliente Casual --</option>
+              {clientes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Tarjeta de Totales */}

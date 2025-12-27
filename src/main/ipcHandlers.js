@@ -146,6 +146,14 @@ function registerIpcHandlers() {
         );
       }
 
+      // 3. Si es Cuenta Corriente, actualizar deuda del cliente
+      if (paymentMethod === "checking_account" && clientId) {
+        await run(
+          "UPDATE clients SET current_debt = current_debt + ? WHERE id = ?",
+          [total, clientId]
+        );
+      }
+
       console.log(`✅ Venta #${saleId} registrada exitosamente`);
       return { success: true, saleId };
     } catch (error) {
@@ -153,6 +161,89 @@ function registerIpcHandlers() {
       return { success: false, message: error.message };
     }
   });
+
+  // ═══════════════════════════════════════════════════════════
+  // HANDLERS DE CLIENTES
+  // ═══════════════════════════════════════════════════════════
+
+  // Obtener todos los clientes activos
+  ipcMain.handle("get-customers", async () => {
+    try {
+      const rows = await all(
+        "SELECT * FROM clients WHERE is_active = 1 ORDER BY name ASC"
+      );
+      return rows;
+    } catch (error) {
+      console.error("Error al obtener clientes:", error);
+      return [];
+    }
+  });
+
+  // Crear nuevo cliente
+  ipcMain.handle("create-customer", async (event, customer) => {
+    try {
+      const { name, dni, phone, current_debt } = customer;
+      await run(
+        "INSERT INTO clients (name, dni, phone, current_debt) VALUES (?, ?, ?, ?)",
+        [name, dni, phone, current_debt || 0]
+      );
+      return { success: true };
+    } catch (error) {
+      console.error("Error al crear cliente:", error);
+      return { success: false, message: error.message };
+    }
+  });
+
+  // Actualizar cliente
+  ipcMain.handle("update-customer", async (event, customer) => {
+    try {
+      const { id, name, dni, phone, current_debt } = customer;
+      await run(
+        "UPDATE clients SET name = ?, dni = ?, phone = ?, current_debt = ? WHERE id = ?",
+        [name, dni, phone, current_debt, id]
+      );
+      return { success: true };
+    } catch (error) {
+      console.error("Error al actualizar cliente:", error);
+      return { success: false, message: error.message };
+    }
+  });
+
+  // Eliminar cliente (Soft Delete)
+  ipcMain.handle("delete-customer", async (event, id) => {
+    try {
+      await run("UPDATE clients SET is_active = 0 WHERE id = ?", [id]);
+      return { success: true };
+    } catch (error) {
+      console.error("Error al eliminar cliente:", error);
+      return { success: false, message: error.message };
+    }
+  });
+
+  // Procesar pago de deuda
+  ipcMain.handle(
+    "process-debt-payment",
+    async (event, { clientId, amount, userId }) => {
+      try {
+        // 1. Descontar deuda del cliente
+        await run(
+          "UPDATE clients SET current_debt = current_debt - ? WHERE id = ?",
+          [amount, clientId]
+        );
+
+        // 2. Registrar movimiento en caja
+        await run(
+          "INSERT INTO movements (type, amount, description, user_id) VALUES (?, ?, ?, ?)",
+          ["entry", amount, `Pago de deuda cliente #${clientId}`, userId || 1]
+        );
+
+        return { success: true };
+      } catch (error) {
+        console.error("Error al procesar pago de deuda:", error);
+        return { success: false, message: error.message };
+      }
+    }
+  );
 
   // ═══════════════════════════════════════════════════════════
   // HANDLERS DE USUARIO / AUTENTICACIÓN

@@ -71,13 +71,13 @@
 - [x] Guardar venta en tabla `sales` + `sale_items`
 - [x] Descontar stock automáticamente
 
-## Fase 5: Gestión de Clientes y Fiados ⏳ PENDIENTE
+## Fase 5: Gestión de Clientes y Fiados ✅ COMPLETO
 
-- [ ] Pantalla `ClientesScreen.jsx` (CRUD)
-- [ ] Asignar cliente a venta
-- [ ] Campo `current_debt` actualizable
-- [ ] Función "Pago a Cuenta" (decrementar deuda)
-- [ ] Vista de deudas por cliente
+- [x] Pantalla `ClientesScreen.jsx` (CRUD)
+- [x] Asignar cliente a venta
+- [x] Campo `current_debt` actualizable
+- [x] Función "Pago a Cuenta" (decrementar deuda)
+- [x] Vista de deudas por cliente
 
 ## Fase 6: Inventario (CRUD Productos) ⏳ PENDIENTE
 
@@ -112,7 +112,7 @@
 | 2    | UI + Login + Layout     | ✅     |
 | 3    | POS + Escáner + Carrito | ✅     |
 | 4    | Modal de Pago + Guardar | ✅     |
-| 5    | Clientes y Fiados       | ⏳     |
+| 5    | Clientes y Fiados       | ✅     |
 | 6    | Inventario CRUD         | ⏳     |
 | 7    | Control de Caja         | ⏳     |
 | 8    | Dashboard/Reportes      | ⏳     |

@@ -1,12 +1,25 @@
 import React, { useState } from "react";
-import { X, CreditCard, Banknote, Wallet, CheckCircle } from "lucide-react";
+import {
+  X,
+  CreditCard,
+  Banknote,
+  Wallet,
+  CheckCircle,
+  UserCheck,
+} from "lucide-react";
 
 /**
  * Modal de Pago
  * Permite seleccionar método de pago (Efectivo, Tarjeta, Mixto)
  * y procesar la transacción con cálculo de vuelto.
  */
-export default function PaymentModal({ isOpen, onClose, total, onConfirm }) {
+export default function PaymentModal({
+  isOpen,
+  onClose,
+  total,
+  onConfirm,
+  clientName,
+}) {
   const [metodo, setMetodo] = useState("efectivo"); // efectivo | tarjeta | mixto
   const [montoRecibido, setMontoRecibido] = useState("");
   const [montoEfectivo, setMontoEfectivo] = useState("");
@@ -44,7 +57,7 @@ export default function PaymentModal({ isOpen, onClose, total, onConfirm }) {
     if (metodo === "efectivo") {
       return parseFloat(montoRecibido) >= total;
     }
-    if (metodo === "tarjeta") {
+    if (metodo === "tarjeta" || metodo === "checking_account") {
       return true; // Siempre válido
     }
     if (metodo === "mixto") {
@@ -171,7 +184,37 @@ export default function PaymentModal({ isOpen, onClose, total, onConfirm }) {
                 </button>
               </div>
 
+              {/* Opción de Cuenta Corriente (Solo si hay cliente) */}
+              {clientName && (
+                <button
+                  onClick={() => setMetodo("checking_account")}
+                  className={`w-full mb-6 p-3 rounded-xl flex items-center justify-center gap-2 transition border-2 ${
+                    metodo === "checking_account"
+                      ? "bg-orange-900/30 border-orange-500 text-orange-400"
+                      : "bg-slate-700 border-transparent text-slate-300 hover:border-slate-500"
+                  }`}
+                >
+                  <UserCheck size={24} />
+                  <span className="font-medium">
+                    Cuenta Corriente ({clientName})
+                  </span>
+                </button>
+              )}
+
               {/* Inputs según método */}
+              {metodo === "checking_account" && (
+                <div className="text-center p-6 bg-slate-900 rounded-xl mb-4 border border-orange-500/30">
+                  <p className="text-orange-400 font-bold text-lg mb-2">
+                    Venta a Crédito
+                  </p>
+                  <p className="text-slate-400">
+                    Se asignará una deuda de{" "}
+                    <strong className="text-white">${total.toFixed(2)}</strong>{" "}
+                    al cliente <strong>{clientName}</strong>.
+                  </p>
+                </div>
+              )}
+
               {metodo === "efectivo" && (
                 <div className="space-y-4">
                   <div>
@@ -222,6 +265,7 @@ export default function PaymentModal({ isOpen, onClose, total, onConfirm }) {
                       onChange={(e) => setMontoEfectivo(e.target.value)}
                       className="w-full p-3 bg-slate-900 border border-slate-600 rounded-xl text-xl text-white text-center font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
                       placeholder="0.00"
+                      autoFocus
                     />
                   </div>
                   <div>
