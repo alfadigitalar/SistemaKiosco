@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 import { User, Lock, ArrowRight } from "lucide-react";
+import confetti from "canvas-confetti";
 
 const LoginScreen = () => {
   const [username, setUsername] = useState("");
@@ -23,16 +24,67 @@ const LoginScreen = () => {
       const result = await window.api.loginUser({ username, password });
 
       if (result.success) {
-        toast.success(`Welcome back, ${result.name}!`);
+        toast.success(`Bienvenido ${result.user.name}!`);
         // Save user to local storage if needed or global state
         localStorage.setItem(
           "user",
           JSON.stringify({
-            id: result.id,
-            name: result.name,
-            role: result.role,
+            id: result.user.id,
+            name: result.user.name,
+            username: result.user.username,
+            role: result.user.role,
+            birthday: result.user.birthday,
+            profile_picture: result.user.profile_picture,
+            created_at: result.user.created_at,
           })
         );
+
+        // CHECK CUMPLEAÑOS
+        if (result.user.birthday) {
+          const today = new Date();
+          const bday = new Date(result.user.birthday + "T00:00:00"); // Fix timezone issue usually
+          if (
+            today.getDate() === bday.getDate() &&
+            today.getMonth() === bday.getMonth()
+          ) {
+            toast(`¡Feliz Cumpleaños ${result.user.name}! 🎂`, {
+              duration: 5000,
+              icon: "🥳",
+              style: {
+                borderRadius: "10px",
+                background: "#FFD700",
+                color: "#000",
+                fontWeight: "bold",
+              },
+            });
+            // Audio Happy Birthday
+            const audio = new Audio("./sounds/birthday.mp3");
+            audio.volume = 0.5;
+            audio.play().catch((e) => console.log("Audio playback failed:", e));
+
+            // Fireworks
+            const duration = 10000;
+            const end = Date.now() + duration;
+            const frame = () => {
+              confetti({
+                particleCount: 5,
+                angle: 60,
+                spread: 55,
+                origin: { x: 0 },
+                colors: ["#bb0000", "#ffffff"],
+              });
+              confetti({
+                particleCount: 5,
+                angle: 120,
+                spread: 55,
+                origin: { x: 1 },
+                colors: ["#bb0000", "#ffffff"],
+              });
+              if (Date.now() < end) requestAnimationFrame(frame);
+            };
+            frame();
+          }
+        }
 
         // Check status of cash session
         try {

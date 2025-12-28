@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { Search, Calendar, Eye, ChevronRight, X } from "lucide-react";
+import {
+  Search,
+  Calendar,
+  Eye,
+  ChevronRight,
+  X,
+  Printer,
+  RotateCcw,
+} from "lucide-react";
 import { toast } from "react-hot-toast";
 
 const HistorialScreen = () => {
@@ -12,6 +20,10 @@ const HistorialScreen = () => {
   const [selectedSale, setSelectedSale] = useState(null);
   const [saleDetails, setSaleDetails] = useState([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
+
+  // Estado para Devoluciones
+  const [returnMode, setReturnMode] = useState(false);
+  const [itemsToReturn, setItemsToReturn] = useState({}); // { itemId: quantity }
 
   // Cargar ventas (inicialmente carga las últimas 100)
   const fetchHistory = async () => {
@@ -37,6 +49,8 @@ const HistorialScreen = () => {
 
   const openDetails = async (sale) => {
     setSelectedSale(sale);
+    setReturnMode(false); // Reset return mode
+    setItemsToReturn({});
     setLoadingDetails(true);
     setSaleDetails([]);
     try {
@@ -46,6 +60,92 @@ const HistorialScreen = () => {
       toast.error("Error al cargar detalle");
     } finally {
       setLoadingDetails(false);
+    }
+  };
+
+  const toggleItemReturn = (index, maxQty) => {
+    setItemsToReturn((prev) => {
+      const newState = { ...prev };
+      if (newState[index]) {
+        delete newState[index];
+      } else {
+        newState[index] = maxQty; // Default to max
+      }
+      return newState;
+    });
+  };
+
+  const updateReturnQty = (index, qty, max) => {
+    if (qty < 1) qty = 1;
+    if (qty > max) qty = max;
+    setItemsToReturn((prev) => ({ ...prev, [index]: qty }));
+  };
+
+  const calculateReturnTotal = () => {
+    let total = 0;
+    Object.keys(itemsToReturn).forEach((index) => {
+      const item = saleDetails[index];
+      total += item.unit_price_at_sale * itemsToReturn[index];
+    });
+    return total;
+  };
+
+  const handleProcessReturn = async () => {
+    if (Object.keys(itemsToReturn).length === 0) {
+      toast.error("Seleccione al menos un producto para devolver");
+      return;
+    }
+
+    const toastId = toast.loading("Procesando devolución...");
+    try {
+      const itemsPayload = Object.keys(itemsToReturn).map((index) => ({
+        productId: saleDetails[index].product_id,
+        quantity: itemsToReturn[index],
+        price: saleDetails[index].unit_price_at_sale,
+      }));
+
+      await window.api.processReturn({
+        saleId: selectedSale.id,
+        items: itemsPayload,
+        totalRefund: calculateReturnTotal(),
+        userId: 1, // TODO: Get actual current user ID from context/auth
+        reason: "Devolución en Kiosco",
+      });
+
+      toast.success("Devolución procesada correctamente", { id: toastId });
+      setSelectedSale(null); // Close modal
+      fetchHistory(); // Refresh lists (optional)
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al procesar devolución", { id: toastId });
+    }
+  };
+
+  const handleReprint = async (sale) => {
+    const toastId = toast.loading("Preparando ticket...");
+    try {
+      // 1. Obtener items
+      const details = await window.api.getSaleDetails(sale.id);
+
+      // 2. Mapear items al formato de impresión
+      const itemsForTicket = details.map((d) => ({
+        quantity: d.quantity,
+        name: d.product_name,
+        price: d.unit_price_at_sale, // El ticket calcula subtotal
+      }));
+
+      // 3. Imprimir
+      await window.api.printTicket({
+        ticketId: sale.id,
+        date: new Date(sale.timestamp).toLocaleString("es-AR"),
+        items: itemsForTicket,
+        total: sale.total_amount,
+      });
+
+      toast.success("Ticket enviado a imprimir", { id: toastId });
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al reimprimir", { id: toastId });
     }
   };
 
@@ -177,12 +277,22 @@ const HistorialScreen = () => {
                     ${sale.total_amount.toLocaleString()}
                   </td>
                   <td className="p-4 text-center">
-                    <button
-                      onClick={() => openDetails(sale)}
-                      className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
-                    >
-                      <Eye size={18} />
-                    </button>
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => handleReprint(sale)}
+                        className="p-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                        title="Re-imprimir Ticket"
+                      >
+                        <Printer size={18} />
+                      </button>
+                      <button
+                        onClick={() => openDetails(sale)}
+                        className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+                        title="Ver Detalles"
+                      >
+                        <Eye size={18} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -229,6 +339,7 @@ const HistorialScreen = () => {
                 <table className="w-full text-left">
                   <thead>
                     <tr className="text-slate-500 border-b border-slate-200 dark:border-slate-700">
+                      {returnMode && <th className="pb-3 w-10"></th>}
                       <th className="pb-3 font-normal">Producto</th>
                       <th className="pb-3 font-normal text-right">Cant.</th>
                       <th className="pb-3 font-normal text-right">
@@ -238,39 +349,127 @@ const HistorialScreen = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                    {saleDetails.map((item, idx) => (
-                      <tr key={idx}>
-                        <td className="py-3">
-                          <div className="font-medium text-slate-800 dark:text-white">
-                            {item.product_name}
-                          </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-500 font-mono">
-                            {item.barcode}
-                          </div>
-                        </td>
-                        <td className="py-3 text-right text-slate-700 dark:text-white">
-                          {item.quantity}
-                        </td>
-                        <td className="py-3 text-right text-slate-500 dark:text-slate-400">
-                          ${item.unit_price_at_sale}
-                        </td>
-                        <td className="py-3 text-right font-bold text-slate-800 dark:text-white">
-                          ${item.subtotal}
-                        </td>
-                      </tr>
-                    ))}
+                    {saleDetails.map((item, idx) => {
+                      const isSelected = !!itemsToReturn[idx];
+                      return (
+                        <tr
+                          key={idx}
+                          className={
+                            isSelected ? "bg-red-50 dark:bg-red-900/10" : ""
+                          }
+                        >
+                          {returnMode && (
+                            <td className="py-3">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() =>
+                                  toggleItemReturn(idx, item.quantity)
+                                }
+                                className="w-5 h-5 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                              />
+                            </td>
+                          )}
+                          <td className="py-3">
+                            <div className="font-medium text-slate-800 dark:text-white">
+                              {item.product_name}
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-500 font-mono">
+                              {item.barcode}
+                            </div>
+                          </td>
+                          <td className="py-3 text-right text-slate-700 dark:text-white">
+                            {returnMode && isSelected ? (
+                              <input
+                                type="number"
+                                min="1"
+                                max={item.quantity}
+                                value={itemsToReturn[idx]}
+                                onChange={(e) =>
+                                  updateReturnQty(
+                                    idx,
+                                    parseInt(e.target.value),
+                                    item.quantity
+                                  )
+                                }
+                                className="w-16 p-1 text-center border rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            ) : (
+                              item.quantity
+                            )}
+                          </td>
+                          <td className="py-3 text-right text-slate-500 dark:text-slate-400">
+                            ${item.unit_price_at_sale}
+                          </td>
+                          <td className="py-3 text-right font-bold text-slate-800 dark:text-white">
+                            $
+                            {returnMode && isSelected
+                              ? (
+                                  item.unit_price_at_sale * itemsToReturn[idx]
+                                ).toLocaleString()
+                              : item.subtotal.toLocaleString()}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
             </div>
 
-            <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-end items-center gap-4 rounded-b-2xl transition-colors">
-              <span className="text-lg text-slate-500 dark:text-slate-400">
-                Total Venta:
-              </span>
-              <span className="text-3xl font-black text-green-600 dark:text-green-400">
-                ${selectedSale.total_amount.toLocaleString()}
-              </span>
+            <div
+              className={`p-6 border-t border-slate-200 dark:border-slate-700 ${
+                returnMode
+                  ? "bg-red-50 dark:bg-red-900/20"
+                  : "bg-slate-50 dark:bg-slate-900/50"
+              } flex justify-between items-center gap-4 rounded-b-2xl transition-colors`}
+            >
+              <div>
+                {!returnMode ? (
+                  <button
+                    onClick={() => setReturnMode(true)}
+                    className="flex items-center gap-2 text-red-600 hover:text-red-700 font-medium px-4 py-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                  >
+                    <RotateCcw size={18} /> Iniciar Devolución
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setReturnMode(false);
+                      setItemsToReturn({});
+                    }}
+                    className="text-slate-500 hover:text-slate-700 font-medium px-4 py-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-4">
+                {returnMode ? (
+                  <>
+                    <span className="text-lg text-red-600 dark:text-red-400 font-bold">
+                      A Reembolsar: ${calculateReturnTotal().toLocaleString()}
+                    </span>
+                    <button
+                      onClick={handleProcessReturn}
+                      className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition-all"
+                    >
+                      Confirmar
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-lg text-slate-500 dark:text-slate-400">
+                      Total Venta:
+                    </span>
+                    <span className="text-3xl font-black text-green-600 dark:text-green-400">
+                      ${selectedSale.total_amount.toLocaleString()}
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>

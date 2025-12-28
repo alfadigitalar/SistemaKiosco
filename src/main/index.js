@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
-const { initDatabase } = require("./db");
+const { initDatabase, get } = require("./db");
 const { registerIpcHandlers } = require("./ipcHandlers");
 const { startServer, stopServer } = require("./server");
 
@@ -62,6 +62,84 @@ app.whenReady().then(() => {
 
   // Handler para obtener info del servidor de escáner
   ipcMain.handle("get-server-info", () => serverInfo);
+
+  /**
+   * Handler para IMPRIMIR TICKET
+   * Recibe: { items, total, date, ... }
+   */
+  const { generateTicketHTML } = require("./ticketTemplate");
+
+  ipcMain.handle("print-ticket", async (event, ticketData) => {
+    try {
+      console.log("Printing ticket...", ticketData);
+
+      // Crear ventana oculta para renderizar el ticket
+      const printWin = new BrowserWindow({
+        show: false,
+        webPreferences: {
+          nodeIntegration: true, // Para permitir imprimir
+        },
+      });
+
+      // Obtener configuración del negocio
+      // La tabla settings es key-value, así que traemos todo y lo mapeamos
+      const { all } = require("./db"); // Importar 'all' si no está disponible, o usar 'get' y cambiar query
+
+      // Nota: initDatabase expone 'get' en exports, pero aqui index.js trae solo { initDatabase, get }.
+      // Necesitamos 'all' para traer todas las settings.
+      // Si 'all' no se exporta en ./db, hay que ir a db.js y exportarlo.
+      // Revisando imports arriba: const { initDatabase, get } = require("./db");
+      // Asumamos que puedo importar 'all' también.
+
+      const rawSettings = await require("./db").all("SELECT * FROM settings");
+      const settings = rawSettings.reduce((acc, row) => {
+        acc[row.key] = row.value;
+        return acc;
+      }, {});
+
+      const storeName = settings.kiosk_name || "Novy Kiosco";
+      const address = settings.kiosk_address || "Dirección no configurada";
+      const logoUrl = settings.ticket_logo || null;
+
+      // Generar HTML
+      const html = generateTicketHTML({
+        storeName,
+        address,
+        logoUrl,
+        footerMessage: "¡Gracias por su compra!",
+        ...ticketData,
+      });
+
+      // Cargar HTML
+      await printWin.loadURL(
+        `data:text/html;charset=utf-8,${encodeURIComponent(html)}`
+      );
+
+      // Imprimir
+      const printers = await printWin.webContents.getPrintersAsync();
+      // Si hay impresoras, imprimir en la default
+      // TODO: Permitir seleccionar impresora en config
+
+      return new Promise((resolve, reject) => {
+        printWin.webContents.print(
+          { silent: true, printBackground: false },
+          (success, errorType) => {
+            if (!success) {
+              console.error("Print failed:", errorType);
+              reject(errorType);
+            } else {
+              console.log("Print success");
+              resolve(true);
+            }
+            printWin.close();
+          }
+        );
+      });
+    } catch (error) {
+      console.error("Error printing ticket:", error);
+      return false;
+    }
+  });
 
   // 3. Crear Ventana Principal
   createWindow();

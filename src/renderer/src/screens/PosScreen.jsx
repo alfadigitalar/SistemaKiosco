@@ -8,12 +8,15 @@ import {
   Menu,
   Smartphone,
   AlertTriangle,
+  Printer,
+  Mail,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 import PaymentModal from "../components/PaymentModal";
 import CustomerSearch from "../components/CustomerSearch";
 import WeightModal from "../components/WeightModal";
+import jsPDF from "jspdf";
 
 /**
  * Pantalla Principal de Punto de Venta (POS)
@@ -45,6 +48,14 @@ export default function PosScreen() {
   // Modal Pesaje
   const [weightModalOpen, setWeightModalOpen] = useState(false);
   const [pendingWeighableProduct, setPendingWeighableProduct] = useState(null);
+
+  // Modal Email
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [lastSale, setLastSale] = useState(null);
+  const [emailToSend, setEmailToSend] = useState("");
+
+  // Ticket config
+  const [shouldPrintTicket, setShouldPrintTicket] = useState(true);
 
   const inputRef = useRef(null);
   const navigate = useNavigate();
@@ -144,11 +155,100 @@ export default function PosScreen() {
       });
     });
 
-    // Cleanup real
     return () => {
       if (removeListener) removeListener();
     };
   }, []);
+
+  // ═══════════════════════════════════════════════════════════
+  // ESCÁNER FÍSICO (USB) Y ATAJOS DE TECLADO
+  // ═══════════════════════════════════════════════════════════
+  useEffect(() => {
+    let buffer = "";
+    let lastKeyTime = Date.now();
+    let timeoutId = null;
+
+    const handleGlobalKeyDown = (e) => {
+      const now = Date.now();
+      const isInputFocused = document.activeElement === inputRef.current;
+
+      // -- ATAJOS DE TECLADO --
+
+      // F9 o Insert: COBRAR
+      if (e.key === "F9" || e.key === "Insert") {
+        e.preventDefault();
+        abrirModalPago();
+        return;
+      }
+
+      // Escape: CANCELAR VENTA (Solo si no hay modales abiertos, para evitar cierre accidental)
+      if (e.key === "Escape" && !modalPagoAbierto && !weightModalOpen) {
+        // Si tiene texto, limpiar input primero
+        if (codigo) {
+          setCodigo("");
+          return;
+        }
+        // Si no, preguntar cancelar
+        cancelarVenta();
+        return;
+      }
+
+      // F2 o F4: FOCALIZAR BUSCADOR
+      if (e.key === "F2" || e.key === "F4") {
+        e.preventDefault();
+        inputRef.current?.focus();
+        inputRef.current?.select();
+        return;
+      }
+
+      // -- LÓGICA DE ESCÁNER USB (Scanner Mode) --
+      // Los escáneres envían teclas muy rápido (ej: < 20-50ms entre caracteres).
+      // Si detectamos esto, capturamos el buffer aunque el foco no esté en el input.
+
+      const char = e.key;
+
+      // Ignorar teclas de control especiales excepto Enter
+      if (char.length > 1 && char !== "Enter") return;
+
+      const timeDiff = now - lastKeyTime;
+      lastKeyTime = now;
+
+      // Si el usuario está escribiendo manual lento (>50ms), reseteamos buffer (salvo que sea el input dedicado)
+      if (timeDiff > 70 && !isInputFocused) {
+        buffer = "";
+      }
+
+      if (char === "Enter") {
+        // Al dar Enter, si hay buffer válido (ej: código barras), lo procesamos
+        if (buffer.length > 2 && !isInputFocused) {
+          e.preventDefault();
+          toast.success("Escáner USB detectado ⚡");
+          setCodigo(buffer);
+
+          window.api.getProductByBarcode(buffer).then((producto) => {
+            if (producto) {
+              agregarAlCarrito(producto);
+              toast.success(producto.name);
+            } else {
+              toast.error("Producto no encontrado");
+            }
+            setCodigo(""); // Limpiar
+          });
+
+          buffer = "";
+        }
+      } else {
+        // Agregar al buffer (si no estamos en un input de texto escribiendo manualmente)
+        // Nota: Si el foco ESTA en el input, dejamos que el evento onChange original maneje todo para no duplicar.
+        if (!isInputFocused) {
+          buffer += char;
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [carrito, modalPagoAbierto, weightModalOpen, codigo]); // Dependencias para funciones dentro del listener
 
   const playLowStockSound = () => {
     // Simple beep using AudioContext
@@ -389,6 +489,34 @@ export default function PosScreen() {
 
       if (resultado.success) {
         toast.success(`Venta #${resultado.saleId} completada`);
+
+        // IMPRIMIR TICKET SI ESTÁ HABILITADO
+        if (shouldPrintTicket) {
+          await window.api.printTicket({
+            ticketId: resultado.saleId,
+            date: new Date().toLocaleString(),
+            items: carrito,
+            total: total,
+          });
+        }
+
+        // PREPARAR PARA EMAIL
+        setLastSale({
+          id: resultado.saleId,
+          items: [...carrito], // Copia
+          total: total,
+          date: new Date().toLocaleString(),
+          clientEmail: clienteSeleccionado?.email || "",
+          clientName: clienteSeleccionado?.name || "Consumidor Final",
+          clientDni: clienteSeleccionado?.dni || "",
+          clientAddress: clienteSeleccionado?.address || "",
+        });
+        setEmailToSend(clienteSeleccionado?.email || "");
+
+        // CERRAR MODAL PAGO Y ABRIR MODAL EMAIL
+        setModalPagoAbierto(false); // Forzar cierre payment
+        setTimeout(() => setEmailModalOpen(true), 500); // Pequeño delay
+
         setCarrito([]); // Limpiar carrito
         localStorage.removeItem("cart_backup");
         setClienteSeleccionado(null); // Resetear cliente
@@ -407,12 +535,6 @@ export default function PosScreen() {
   // ═══════════════════════════════════════════════════════════
   return (
     <div className="flex h-full gap-4 text-slate-900 dark:text-white">
-      <Toaster
-        position="bottom-left"
-        toastOptions={{
-          style: { background: "#334155", color: "#fff" },
-        }}
-      />
       {/* Modal de Pago */}
       <PaymentModal
         isOpen={modalPagoAbierto}
@@ -436,6 +558,268 @@ export default function PosScreen() {
           }
         }}
       />
+      {/* Modal Email */}
+      {emailModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700 p-6 animate-in zoom-in-95">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Mail className="text-blue-500" /> Enviar Ticket por Email
+              </h2>
+              <button
+                onClick={() => setEmailModalOpen(false)}
+                className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 p-1 rounded-full"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="text-slate-600 dark:text-slate-300 mb-4 text-sm">
+              La venta fue exitosa. ¿Desea enviar el comprobante por correo?
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-sm font-bold mb-2">
+                Correo Electrónico
+              </label>
+              <input
+                type="email"
+                autoFocus
+                className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="cliente@email.com"
+                value={emailToSend}
+                onChange={(e) => setEmailToSend(e.target.value)}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setEmailModalOpen(false)}
+                className="px-4 py-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
+              >
+                No enviar
+              </button>
+              <button
+                onClick={async () => {
+                  if (!emailToSend.includes("@")) {
+                    toast.error("Email inválido");
+                    return;
+                  }
+                  const toastId = toast.loading("Enviando correo...");
+                  // Enviar
+                  // Nota: generamos el PDF en Main dentro del handler, no aquí.
+                  // Pero send-email-ticket espera pdfBuffer?
+                  // PLAN UPDATE: send-email-ticket should generate PDF or receive it.
+                  // The handler I wrote in Step 3551 expects `pdfBuffer`.
+                  // SO I NEED TO GENERATE PDF HERE.
+                  // I need to import logic from 'ReportesScreen' or similar?
+                  // Actually, `window.api.printTicket` generates PDF/Print logic in MAIN?
+                  // No, `print-ticket` handles printing.
+                  // I should reuse the logic to generate PDF buffer.
+                  // BUT `jspdf` is in renderer.
+                  // So I can use `jspdf` here.
+
+                  try {
+                    // Generar PDF "Factura B" Style
+                    const doc = new jsPDF();
+                    const pageWidth = doc.internal.pageSize.width; // ~210mm
+                    const pageHeight = doc.internal.pageSize.height;
+
+                    // --- DATOS DEL COMERCIO (Mockup / LocalStorage) ---
+                    const storeName =
+                      localStorage.getItem("kioskName") || "MI KIOSCO";
+                    const storeAddress = "Dirección del Comercio 123"; // Podríamos agregar esto a Config
+                    const storeCuit = "30-12345678-9";
+                    const isDev = false;
+
+                    // --- ESTRUCTURA ---
+
+                    // 1. RECTÁNGULO GRANDE PRINCIPAL (Encabezado)
+                    // (x, y, w, h)
+                    doc.setLineWidth(0.5);
+                    doc.rect(10, 10, 190, 50);
+
+                    // Línea vertical divisoria
+                    doc.line(105, 10, 105, 60);
+
+                    // 2. CAJA "B"
+                    doc.rect(98, 5, 14, 14); // Caja flotante central
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(20);
+                    doc.text("B", 105, 14, { align: "center" });
+                    doc.setFontSize(8);
+                    doc.text("COD. 06", 105, 18, { align: "center" });
+
+                    // Linea que conecta la caja B con el borde
+                    doc.setLineWidth(0.5);
+                    doc.line(105, 19, 105, 60); // Continua la vertical
+
+                    // 3. LADO IZQUIERDO (Comercio)
+                    doc.setFontSize(24);
+                    doc.setFont("helvetica", "bold");
+                    doc.text(storeName.toUpperCase(), 55, 30, {
+                      align: "center",
+                    });
+
+                    doc.setFontSize(9);
+                    doc.setFont("helvetica", "normal");
+                    doc.text(`Domicilio: ${storeAddress}`, 55, 45, {
+                      align: "center",
+                    });
+                    doc.text("IVA Responsable Inscripto", 55, 50, {
+                      align: "center",
+                    });
+
+                    // 4. LADO DERECHO (Datos Factura)
+                    doc.setFontSize(18);
+                    doc.setFont("helvetica", "bold");
+                    doc.text("FACTURA", 150, 20, { align: "center" });
+
+                    doc.setFontSize(10);
+                    doc.setFont("helvetica", "bold");
+                    doc.text(
+                      `Nro. Comprobante: 0001-${lastSale?.id
+                        .toString()
+                        .padStart(8, "0")}`,
+                      120,
+                      30
+                    );
+                    doc.text(`Fecha de Emisión: ${lastSale?.date}`, 120, 35);
+
+                    doc.setFontSize(9);
+                    doc.setFont("helvetica", "normal");
+                    doc.text(`C.U.I.T: ${storeCuit}`, 120, 42);
+                    doc.text(`Ing. Brutos: ${storeCuit}`, 120, 47);
+                    doc.text(`Inicio de Actividades: 01/01/2024`, 120, 52);
+
+                    // 5. DATOS DEL CLIENTE (Tira Horizontal)
+                    doc.rect(10, 62, 190, 12); // Caja
+                    doc.setFontSize(9);
+                    doc.setFont("helvetica", "bold");
+                    doc.text("Apellido y Nombre / Razón Social:", 12, 68);
+                    doc.setFont("helvetica", "normal");
+                    doc.text(
+                      lastSale?.clientName || "Consumidor Final",
+                      70,
+                      68
+                    );
+
+                    doc.setFont("helvetica", "bold");
+                    doc.text("DNI / CUIT:", 130, 68);
+                    doc.setFont("helvetica", "normal");
+                    doc.text(lastSale?.clientDni || "-", 150, 68);
+
+                    doc.setFont("helvetica", "bold");
+                    doc.text("Condición IVA:", 12, 72); // Segunda linea dentro de la caja? No, ajustamos
+                    doc.setFont("helvetica", "normal");
+                    doc.text("Consumidor Final", 40, 72);
+
+                    // 6. TABLA DE PRODUCTOS
+                    let y = 78;
+                    // Encabezados (Fondo gris si quisieramos `doc.setFillColor(200, 200, 200); doc.rect(...)`)
+                    doc.setFillColor(230, 230, 230);
+                    doc.rect(10, y, 190, 8, "F"); // Relleno
+                    doc.rect(10, y, 190, 8, "S"); // Borde
+
+                    doc.setFont("helvetica", "bold");
+                    doc.setTextColor(0, 0, 0);
+                    doc.text("Producto", 15, y + 5);
+                    doc.text("Cant.", 130, y + 5, { align: "center" });
+                    doc.text("P. Unitario", 160, y + 5, { align: "right" });
+                    doc.text("Subtotal", 195, y + 5, { align: "right" });
+
+                    y += 8;
+                    doc.setFont("helvetica", "normal");
+
+                    lastSale?.items.forEach((item) => {
+                      const subtotal = item.sale_price * item.cantidad;
+                      const itemName =
+                        item.name.length > 45
+                          ? item.name.substring(0, 45) + "..."
+                          : item.name;
+
+                      doc.text(itemName, 12, y + 5);
+                      doc.text(item.cantidad.toString(), 130, y + 5, {
+                        align: "center",
+                      });
+                      doc.text(item.sale_price.toFixed(2), 160, y + 5, {
+                        align: "right",
+                      });
+                      doc.text(subtotal.toFixed(2), 195, y + 5, {
+                        align: "right",
+                      });
+
+                      y += 8;
+                    });
+
+                    // Línea final de items
+                    doc.line(10, y, 200, y);
+                    y += 5;
+
+                    // 7. TOTALES (Pie Derecho)
+                    // Subtotal
+                    doc.setFont("helvetica", "bold");
+                    doc.text("Subtotal:", 160, y + 5, { align: "right" });
+                    doc.text(`$${lastSale?.total.toFixed(2)}`, 195, y + 5, {
+                      align: "right",
+                    });
+                    y += 6;
+
+                    // Total
+                    doc.setFillColor(230, 230, 230); // Fondo gris para total
+                    doc.rect(140, y, 60, 8, "F");
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFontSize(11);
+                    doc.text("Total:", 160, y + 5, { align: "right" });
+                    doc.text(`$${lastSale?.total.toFixed(2)}`, 195, y + 5, {
+                      align: "right",
+                    });
+
+                    y += 15;
+
+                    // 8. LEGALES / QR (Simulado)
+                    doc.setFontSize(8);
+                    doc.setFont("helvetica", "bold");
+                    doc.text("CAE N°: 7341823741283", 150, y);
+                    doc.text("Fecha Vto. CAE: 01/01/2026", 150, y + 4);
+
+                    doc.setFont("helvetica", "italic");
+                    doc.text("Comprobante Autorizado", 12, y);
+                    doc.text(
+                      "Esta factura es un documento no válido como factura fiscal real (Demo Novy POS)",
+                      12,
+                      y + 4
+                    );
+
+                    const pdfArrayBuffer = doc.output("arraybuffer");
+
+                    const res = await window.api.sendEmailTicket({
+                      email: emailToSend,
+                      subject: `Factura #${lastSale?.id} - ${storeName}`,
+                      pdfBuffer: pdfArrayBuffer,
+                    });
+
+                    if (res.success) {
+                      toast.success("Email enviado!", { id: toastId });
+                      setEmailModalOpen(false);
+                    } else {
+                      toast.error("Error: " + res.message, { id: toastId });
+                    }
+                  } catch (e) {
+                    console.error("Error generando PDF/Email:", e);
+                    toast.error("Error: " + (e.message || "Desconocido"), {
+                      id: toastId,
+                    });
+                  }
+                }}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center gap-2"
+              >
+                <Mail size={18} /> Enviar Ticket
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* ════════════════════════════════════════════════════════ */}
       {/* SECCIÓN IZQUIERDA: LISTA DE PRODUCTOS */}
       {/* ════════════════════════════════════════════════════════ */}
@@ -707,18 +1091,65 @@ export default function PosScreen() {
 
           {/* Botones de Acción */}
           <div className="grid gap-3 mt-8">
+            {/* Toggle Impresión */}
+            <div
+              onClick={() => setShouldPrintTicket(!shouldPrintTicket)}
+              className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
+                shouldPrintTicket
+                  ? "bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800"
+                  : "bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-700"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Printer
+                  size={20}
+                  className={
+                    shouldPrintTicket
+                      ? "text-blue-600 dark:text-blue-400"
+                      : "text-slate-400"
+                  }
+                />
+                <span
+                  className={`font-bold text-sm ${
+                    shouldPrintTicket
+                      ? "text-blue-700 dark:text-blue-300"
+                      : "text-slate-500"
+                  }`}
+                >
+                  Imprimir Ticket
+                </span>
+              </div>
+              <div
+                className={`w-12 h-6 rounded-full p-1 transition-colors ${
+                  shouldPrintTicket
+                    ? "bg-blue-600"
+                    : "bg-slate-300 dark:bg-slate-600"
+                }`}
+              >
+                <div
+                  className={`bg-white w-4 h-4 rounded-full shadow-sm transition-transform ${
+                    shouldPrintTicket ? "translate-x-6" : "translate-x-0"
+                  }`}
+                />
+              </div>
+            </div>
+
             <button
               onClick={abrirModalPago}
               className="w-full py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-xl shadow-lg shadow-green-900/30 flex items-center justify-center gap-3 transition transform active:scale-95"
+              title="Presiona F9 para cobrar rápido"
             >
-              <CreditCard size={28} /> COBRAR
+              <CreditCard size={28} /> COBRAR{" "}
+              <span className="text-sm opacity-60 font-mono ml-1">[F9]</span>
             </button>
 
             <button
               onClick={cancelarVenta}
               className="w-full py-3 bg-slate-100 hover:bg-red-50 dark:bg-slate-700 dark:hover:bg-red-900/50 text-slate-600 dark:text-slate-300 hover:text-red-500 dark:hover:text-red-200 rounded-xl font-semibold flex items-center justify-center gap-2 transition"
+              title="Presiona ESC para cancelar"
             >
-              <X size={20} /> Cancelar Venta
+              <X size={20} /> Cancelar Venta{" "}
+              <span className="text-sm opacity-60 font-mono ml-1">[ESC]</span>
             </button>
           </div>
         </div>

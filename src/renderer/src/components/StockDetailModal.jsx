@@ -65,7 +65,7 @@ export default function StockDetailModal({
     try {
       const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-      await window.api.addStockMovement({
+      const result = await window.api.addStockMovement({
         product_id: product.id,
         type: formData.type,
         quantity: parseFloat(formData.quantity),
@@ -73,13 +73,24 @@ export default function StockDetailModal({
         user_id: user.id || 1, // Fallback admin
       });
 
-      toast.success("Movimiento registrado");
+      if (!result.success) {
+        throw new Error(result.message || "Error al registrar movimiento");
+      }
+
+      toast.success(
+        formData.type === "purchase"
+          ? "Stock Agregado Correctamente"
+          : formData.type === "sale"
+          ? "Venta Registrada"
+          : "Movimiento Guardado"
+      );
+
       onStockUpdate(); // Recargar inventario global
       loadHistory(); // Recargar historial local
       setMode("history"); // Volver a la lista
     } catch (error) {
       console.error(error);
-      toast.error("Error al guardar movimiento");
+      toast.error(error.message || "Error al guardar movimiento");
     }
   };
 

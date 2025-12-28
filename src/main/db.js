@@ -111,7 +111,51 @@ async function initDatabase() {
       }
     }
 
+    // MIGRATION: Add Users Profile Columns (Fase 27)
+    // Se debe hacer individualmente para que el fallo de una no detenga las otras
+    try {
+      db.run("ALTER TABLE users ADD COLUMN birthday DATE");
+    } catch (e) {}
+    try {
+      db.run("ALTER TABLE users ADD COLUMN profile_picture TEXT");
+    } catch (e) {}
+    try {
+      db.run(
+        "ALTER TABLE users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
+      );
+    } catch (e) {}
+
+    // MIGRATION: stock_movements TABLE (Fase 25 - Fix Persistence)
+    try {
+      db.run(`CREATE TABLE IF NOT EXISTS stock_movements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        type TEXT NOT NULL CHECK(type IN ('purchase', 'adjustment_add', 'adjustment_sub', 'sale', 'loss', 'return')),
+        quantity REAL NOT NULL,
+        reason TEXT,
+        user_id INTEGER,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(product_id) REFERENCES products(id),
+        FOREIGN KEY(user_id) REFERENCES users(id)
+      )`);
+    } catch (e) {}
+
+    // MIGRATION: Cash Security Columns (Fase 32)
+    try {
+      db.run("ALTER TABLE cash_sessions ADD COLUMN real_amount REAL");
+    } catch (e) {}
+    try {
+      db.run("ALTER TABLE cash_sessions ADD COLUMN difference REAL");
+    } catch (e) {}
+
     saveDatabase(); // Guardar cambios de estructura
+
+    // DEBUG: Ver columnas de users
+    const cols = db.exec("PRAGMA table_info(users)")[0].values;
+    console.log(
+      "[DB DEBUG] Users Table Columns:",
+      cols.map((c) => c[1])
+    ); // db.exec returns [{columns, values}]
   } catch (error) {
     console.error("Error al inicializar base de datos:", error);
     throw error;
@@ -315,6 +359,32 @@ function createTables() {
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(product_id) REFERENCES products(id),
       FOREIGN KEY(user_id) REFERENCES users(id)
+    );
+
+    -- ═══════════════════════════════════════════════════════════
+    -- TABLA: DEVOLUCIONES
+    -- Registro de reembolsos y devoluciones de productos
+    -- ═══════════════════════════════════════════════════════════
+    CREATE TABLE IF NOT EXISTS returns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sale_id INTEGER, 
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      total_refund REAL NOT NULL,
+      reason TEXT,
+      user_id INTEGER,
+      FOREIGN KEY(sale_id) REFERENCES sales(id),
+      FOREIGN KEY(user_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS return_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      return_id INTEGER NOT NULL,
+      product_id INTEGER NOT NULL,
+      quantity INTEGER NOT NULL,
+      refund_price REAL NOT NULL,
+      subtotal REAL NOT NULL,
+      FOREIGN KEY(return_id) REFERENCES returns(id),
+      FOREIGN KEY(product_id) REFERENCES products(id)
     );
   `;
 

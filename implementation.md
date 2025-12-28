@@ -226,7 +226,36 @@ Asegurar que las ventas registren la fecha/hora local correcta y el usuario real
 | 21   | Análisis de Ganancias           | ✅     |
 | 22   | Unidades de Medida              | ✅     |
 | 23   | Modal de Pesaje (Smart Weight)  | ✅     |
-| 24   | Control de Stock Avanzado       | ⏳     |
+| 24   | Control de Stock Avanzado       | ✅     |
+| 25   | Seguridad de Caja               | ✅     |
+| 26   | Impresión de Tickets            | ⏳     |
+
+## Fase 26: Impresión de Tickets
+
+### Backend (Electron IPC)
+
+- [ ] Handler `print-ticket`:
+  - Recibe objeto de venta (items, total, fecha).
+  - Crea una `BrowserWindow` oculta.
+  - Genera HTML dinámico con estilos CSS para 58mm/80mm.
+  - Ejecuta `win.webContents.print({ silent: true })`.
+
+### Frontend
+
+- [ ] `PosScreen.jsx`:
+  - Invocar `print-ticket` tras completar pago exitosamente.
+  - Opción (checkbox) "Imprimir Ticket" marcada por defecto.
+- [ ] `ConfiguracionScreen.jsx`:
+  - Campos para "Nombre del Negocio", "Dirección", "Mensaje al Pie".
+
+### Template de Ticket
+
+- [ ] HTML sencillo con:
+  - Header (Logo/Nombre).
+  - Metadatos (Fecha, Nro Ticket).
+  - Tabla de Items (Cant x Precio).
+  - Totales.
+  - Footer.
 
 **Repositorio:** https://github.com/alfadigitalar/SistemaKiosco
 

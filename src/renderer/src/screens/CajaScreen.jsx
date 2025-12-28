@@ -25,6 +25,9 @@ const CajaScreen = () => {
   // Confirmation Modal State
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [pendingClose, setPendingClose] = useState(false);
+  const [closingWithRealAmount, setClosingWithRealAmount] = useState("");
+
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   // Estados de carga de datos auxiliares
   const [refreshKey, setRefreshKey] = useState(0);
@@ -75,7 +78,8 @@ const CajaScreen = () => {
   const generateCloseReportPDF = (
     closedSession,
     finalSummary,
-    sessionMovements
+    sessionMovements,
+    realAmount
   ) => {
     try {
       const doc = new jsPDF();
@@ -108,7 +112,14 @@ const CajaScreen = () => {
         ],
         ["Total Entradas", `$${finalSummary.totalIn?.toLocaleString()}`],
         ["Total Salidas", `-$${finalSummary.totalOut?.toLocaleString()}`],
-        ["TOTAL EN CAJA", `$${finalSummary.finalBalance?.toLocaleString()}`],
+        ["TOTAL SISTEMA", `$${finalSummary.finalBalance?.toLocaleString()}`],
+        ["ARQUEO (REAL)", `$${(realAmount || 0)?.toLocaleString()}`],
+        [
+          "DIFERENCIA",
+          `$${(
+            (realAmount || 0) - finalSummary.finalBalance
+          ).toLocaleString()}`,
+        ],
       ];
 
       autoTable(doc, {
@@ -191,6 +202,10 @@ const CajaScreen = () => {
   // Confirmar Cierre (Ejecuta Acción)
   const confirmCloseBox = async () => {
     try {
+      const realAmount = closingWithRealAmount
+        ? parseFloat(closingWithRealAmount)
+        : 0;
+
       // Capturar estado actual para el reporte antes de borrarlo
       const closingSession = session;
       const closingSummary = summary;
@@ -201,25 +216,30 @@ const CajaScreen = () => {
         finalAmount: summary.finalBalance,
         totalSales: summary.totalSalesCash,
         totalMovements: summary.totalIn - summary.totalOut,
+        realAmount: realAmount,
       });
 
       if (result.success) {
         toast.success("Caja cerrada exitosamente");
 
         // Generar PDF con los datos capturados
+        // Pasamos realAmount para que salga en el PDF el arqueo
         generateCloseReportPDF(
           closingSession,
           closingSummary,
-          closingMovements
+          closingMovements,
+          realAmount
         );
 
         setSession(null);
         setSummary(null);
         setRefreshKey((prev) => prev + 1);
+        setClosingWithRealAmount("");
       } else {
         toast.error(result.message);
       }
     } catch (error) {
+      console.error(error);
       toast.error("Error al cerrar caja");
     } finally {
       setIsConfirmOpen(false);
@@ -338,7 +358,9 @@ const CajaScreen = () => {
             Ventas (Efectivo)
           </p>
           <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-            +${summary?.totalSalesCash?.toLocaleString()}
+            {user?.role === "admin"
+              ? `+$${summary?.totalSalesCash?.toLocaleString()}`
+              : "******"}
           </p>
         </div>
         {/* Movimientos */}
@@ -348,11 +370,15 @@ const CajaScreen = () => {
           </p>
           <div className="flex gap-3 items-baseline">
             <span className="text-green-600 dark:text-green-400 font-bold">
-              +${summary?.totalIn?.toLocaleString()}
+              {user?.role === "admin"
+                ? `+$${summary?.totalIn?.toLocaleString()}`
+                : "***"}
             </span>
             <span className="text-slate-400 dark:text-slate-500">/</span>
             <span className="text-red-600 dark:text-red-400 font-bold">
-              -${summary?.totalOut?.toLocaleString()}
+              {user?.role === "admin"
+                ? `-$${summary?.totalOut?.toLocaleString()}`
+                : "***"}
             </span>
           </div>
         </div>
@@ -362,7 +388,9 @@ const CajaScreen = () => {
             Total en Caja (Teórico)
           </p>
           <p className="text-4xl font-black text-blue-900 dark:text-white">
-            ${summary?.finalBalance?.toLocaleString()}
+            {user?.role === "admin"
+              ? `$${summary?.finalBalance?.toLocaleString()}`
+              : "******"}
           </p>
         </div>
       </div>
@@ -504,16 +532,50 @@ const CajaScreen = () => {
         </div>
       </div>
 
-      <ConfirmationModal
-        isOpen={isConfirmOpen}
-        onClose={() => setIsConfirmOpen(false)}
-        onConfirm={confirmCloseBox}
-        title="Cerrar Caja"
-        message="¿Seguro que desea cerrar la caja? Esta acción generará el reporte final del saldo y ventas del día."
-        confirmText="Cerrar y Generar Reporte"
-        cancelText="Cancelar"
-        isDestructive={true}
-      />
+      {/* Modal de Cierre de Caja (Arqueo) */}
+      {isConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700 p-6 animate-in zoom-in-95">
+            <h2 className="text-2xl font-bold mb-4 text-slate-800 dark:text-white">
+              Cerrar Caja
+            </h2>
+            <p className="mb-6 text-slate-600 dark:text-slate-400">
+              Por favor, realice el arqueo y cuente el dinero físico en caja.
+            </p>
+
+            <div className="mb-6">
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+                Monto Real (En efectivo)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className="w-full text-3xl font-bold p-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="0.00"
+                value={closingWithRealAmount}
+                onChange={(e) => setClosingWithRealAmount(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setIsConfirmOpen(false)}
+                className="px-4 py-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmCloseBox}
+                className="px-6 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold shadow-lg"
+              >
+                Confirmar Cierre
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

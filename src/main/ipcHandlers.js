@@ -1,4 +1,7 @@
-const { ipcMain } = require("electron");
+const { ipcMain, dialog } = require("electron");
+const fs = require("fs");
+const path = require("path");
+const nodemailer = require("nodemailer");
 const { all, get, run } = require("./db");
 
 /**
@@ -380,13 +383,26 @@ function registerIpcHandlers() {
   // Cerrar Caja
   ipcMain.handle(
     "close-cash-session",
-    async (event, { sessionId, finalAmount, totalSales, totalMovements }) => {
+    async (
+      event,
+      { sessionId, finalAmount, totalSales, totalMovements, realAmount }
+    ) => {
       try {
+        const difference =
+          realAmount !== undefined ? realAmount - finalAmount : 0;
+
         await run(
           `UPDATE cash_sessions 
-         SET closed_at = CURRENT_TIMESTAMP, final_amount = ?, total_sales = ?, total_movements = ? 
+         SET closed_at = CURRENT_TIMESTAMP, final_amount = ?, total_sales = ?, total_movements = ?, real_amount = ?, difference = ?
          WHERE id = ?`,
-          [finalAmount, totalSales, totalMovements, sessionId]
+          [
+            finalAmount,
+            totalSales,
+            totalMovements,
+            realAmount !== undefined ? realAmount : null,
+            difference,
+            sessionId,
+          ]
         );
         return { success: true };
       } catch (error) {
@@ -553,6 +569,83 @@ function registerIpcHandlers() {
         topProducts: [],
         salesChartData: [],
       };
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // HANDLERS DE DEVOLUCIONES
+  // ═══════════════════════════════════════════════════════════
+
+  ipcMain.handle("process-return", async (event, returnData) => {
+    try {
+      const { items, totalRefund, saleId, userId, reason } = returnData;
+
+      await run("BEGIN TRANSACTION");
+
+      // 1. Registrar devolución
+      const result = await run(
+        "INSERT INTO returns (sale_id, total_refund, reason, user_id) VALUES (?, ?, ?, ?)",
+        [saleId, totalRefund, reason || "Devolución", userId]
+      );
+      // 'run' en db.js devuelve Changes info, pero necesitamos el ID.
+      // sql.js devuelve el lastInsertId en el result object si modificamos db.js,
+      // pero por defecto db.js wrapper devuelve algo?
+      // Revisé db.js y devuelve: return db.prepare(sql).run(params); (o similar).
+      // better-sqlite3 style: result.lastInsertRowid.
+      // sql.js 'run' returns nothing useful directly usually, but let's check db.js implementation.
+      // Si db.js usa db.run(sql, params), sql.js no devuelve el ID ahí.
+      // Necesito 'select last_insert_rowid()'.
+
+      const idResult = await get("SELECT last_insert_rowid() as id");
+      const returnId = idResult.id;
+
+      // 2. Procesar Items
+      for (const item of items) {
+        // a. Registrar item de devolución
+        await run(
+          "INSERT INTO return_items (return_id, product_id, quantity, refund_price, subtotal) VALUES (?, ?, ?, ?, ?)",
+          [
+            returnId,
+            item.productId,
+            item.quantity,
+            item.price,
+            item.quantity * item.price,
+          ]
+        );
+
+        // b. Devolver Stock
+        await run(
+          "UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?",
+          [item.quantity, item.productId]
+        );
+
+        // c. Registrar Movimiento de Stock
+        await run(
+          "INSERT INTO stock_movements (product_id, type, quantity, reason, user_id) VALUES (?, 'return', ?, ?, ?)",
+          [
+            item.productId,
+            item.quantity,
+            `Devolución Ticket #${saleId}`,
+            userId,
+          ]
+        );
+      }
+
+      // 3. Registrar Salida de Caja (Refund)
+      // Solo si el monto es > 0
+      if (totalRefund > 0) {
+        await run(
+          "INSERT INTO movements (type, amount, description, user_id) VALUES ('withdrawal', ?, ?, ?)",
+          [totalRefund, `Reembolso Devolución Ticket #${saleId}`, userId]
+        );
+      }
+
+      await run("COMMIT");
+      return { success: true, returnId };
+    } catch (error) {
+      await run("ROLLBACK");
+      console.error("Error processing return:", error);
+      return { success: false, message: error.message };
     }
   });
 
@@ -793,7 +886,18 @@ function registerIpcHandlers() {
       // pero en JS la comparación === es estricta.
       if (user.password_hash === password) {
         console.log(`[LOGIN DEBUG] ✅ Contraseña CORRECTA.`);
-        return { success: true, name: user.name, role: user.role, id: user.id };
+        return {
+          success: true,
+          user: {
+            id: user.id,
+            name: user.name,
+            username: user.username,
+            role: user.role,
+            birthday: user.birthday,
+            profile_picture: user.profile_picture,
+            created_at: user.created_at,
+          },
+        };
       } else {
         console.log(
           `[LOGIN DEBUG] ❌ Contraseña INCORRECTA. La DB espera '${user.password_hash}' pero recibió '${password}'`
@@ -848,22 +952,55 @@ function registerIpcHandlers() {
   // Actualizar usuario
   ipcMain.handle("update-user", async (event, userData) => {
     try {
-      const { id, name, username, password, role } = userData;
+      const { id, name, username, password, role, birthday, profile_picture } =
+        userData;
 
+      // Construcción dinámica del query
+      console.log("[UPDATE DEBUG] Recibida data:", {
+        id,
+        name,
+        username,
+        hasBirthday: !!birthday,
+        hasPic: !!profile_picture,
+      });
+      if (profile_picture)
+        console.log("[UPDATE DEBUG] Pic Length:", profile_picture.length);
+
+      let fields = [];
+      let params = [];
+
+      if (name) {
+        fields.push("name=?");
+        params.push(name);
+      }
+      if (username) {
+        fields.push("username=?");
+        params.push(username);
+      }
       if (password && password.trim() !== "") {
-        // Si viene password, actualizamos todo
-        await run(
-          "UPDATE users SET name=?, username=?, password_hash=?, role=? WHERE id=?",
-          [name, username, password, role, id]
-        );
-      } else {
-        // Si no, solo datos
-        await run("UPDATE users SET name=?, username=?, role=? WHERE id=?", [
-          name,
-          username,
-          role,
-          id,
-        ]);
+        fields.push("password_hash=?");
+        params.push(password);
+      }
+      if (role) {
+        fields.push("role=?");
+        params.push(role);
+      }
+
+      // Permitir borrar (null) o actualizar
+      if (birthday !== undefined) {
+        fields.push("birthday=?");
+        params.push(birthday);
+      }
+      if (profile_picture !== undefined) {
+        fields.push("profile_picture=?");
+        params.push(profile_picture);
+      }
+
+      params.push(id); // WHERE id=?
+
+      if (fields.length > 0) {
+        const sql = `UPDATE users SET ${fields.join(", ")} WHERE id=?`;
+        await run(sql, params);
       }
       return { success: true };
     } catch (error) {
@@ -944,6 +1081,243 @@ function registerIpcHandlers() {
     } catch (error) {
       console.error("Error al obtener movimientos:", error);
       return [];
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // HANDLERS GENERALES
+  // ═══════════════════════════════════════════════════════════
+
+  // Exportar Data a CSV
+  ipcMain.handle("export-data", async (event) => {
+    try {
+      // 1. Seleccionar Carpeta
+      const { canceled, filePaths } = await dialog.showOpenDialog({
+        title: "Seleccionar Carpeta para Exportar",
+        properties: ["openDirectory"],
+      });
+
+      if (canceled || filePaths.length === 0) {
+        return { success: false, message: "Exportación cancelada" };
+      }
+
+      const destFolder = filePaths[0];
+
+      // 2. Helper to CSV
+      const toCSV = (rows) => {
+        if (!rows || rows.length === 0) return "";
+        const headers = Object.keys(rows[0]);
+        const headerRow = headers.join(",");
+        const values = rows.map((row) =>
+          headers
+            .map((field) => {
+              let val =
+                row[field] === null || row[field] === undefined
+                  ? ""
+                  : row[field];
+              val = val.toString().replace(/"/g, '""'); // Escape quotes
+              if (val.search(/("|,|\n)/g) >= 0) val = `"${val}"`; // Quote if needed
+              return val;
+            })
+            .join(",")
+        );
+        return [headerRow, ...values].join("\n");
+      };
+
+      // 3. Fetch & Write Products
+      const products = await all("SELECT * FROM products");
+      fs.writeFileSync(
+        path.join(destFolder, "productos_novy.csv"),
+        toCSV(products)
+      );
+
+      // 4. Fetch & Write Clients
+      const clients = await all("SELECT * FROM clients");
+      fs.writeFileSync(
+        path.join(destFolder, "clientes_novy.csv"),
+        toCSV(clients)
+      );
+
+      // 5. Fetch & Write Sales
+      const sales = await all(`
+        SELECT s.id, s.timestamp, s.total_amount, s.payment_method, 
+               u.name as vendedor, c.name as cliente 
+        FROM sales s 
+        LEFT JOIN users u ON s.user_id = u.id 
+        LEFT JOIN clients c ON s.client_id = c.id
+      `);
+      fs.writeFileSync(path.join(destFolder, "ventas_novy.csv"), toCSV(sales));
+
+      return { success: true, path: destFolder };
+    } catch (error) {
+      console.error("Error exporting data:", error);
+      return { success: false, message: error.message };
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // HANDLERS DE EMAIL (Fase 35)
+  // ═══════════════════════════════════════════════════════════
+
+  ipcMain.handle(
+    "send-email-ticket",
+    async (event, { email, subject, ticketData, pdfBuffer }) => {
+      try {
+        // 1. Obtener Configuración SMTP
+        const settings = await all(
+          "SELECT * FROM settings WHERE key LIKE 'smtp_%'"
+        );
+        const config = {};
+        settings.forEach((s) => (config[s.key] = s.value));
+
+        if (!config.smtp_host || !config.smtp_user || !config.smtp_pass) {
+          return {
+            success: false,
+            message: "Falta configurar SMTP en Configuración",
+          };
+        }
+
+        // 2. Configurar Transporter
+        const transporter = nodemailer.createTransport({
+          host: config.smtp_host,
+          port: parseInt(config.smtp_port) || 587,
+          secure: config.smtp_secure === "true", // true for 465, false for other ports
+          auth: {
+            user: config.smtp_user,
+            pass: config.smtp_pass,
+          },
+        });
+
+        // 3. Enviar Email
+        await transporter.sendMail({
+          from: `"Novy POS" <${config.smtp_user}>`,
+          to: email,
+          subject: subject || "Su Ticket de Compra",
+          text: "Adjunto encontrará su comprobante de compra. Gracias por su preferencia!",
+          attachments: [
+            {
+              filename: `Ticket_${Date.now()}.pdf`,
+              content: Buffer.from(pdfBuffer), // pdfBuffer viene como ArrayBuffer o Uint8Array desde Renderer
+            },
+          ],
+        });
+
+        return { success: true };
+      } catch (error) {
+        console.error("Error enviando email:", error);
+        return { success: false, message: error.message };
+      }
+    }
+  );
+
+  // ═══════════════════════════════════════════════════════════
+  // HANDLERS DE BACKUP
+  // ═══════════════════════════════════════════════════════════
+
+  const BACKUP_DIR = path.join(
+    require("electron").app.getPath("userData"),
+    "backups"
+  );
+  if (!fs.existsSync(BACKUP_DIR)) {
+    fs.mkdirSync(BACKUP_DIR);
+  }
+
+  // Crear Backup
+  ipcMain.handle("create-backup", async () => {
+    try {
+      const { app } = require("electron");
+      const isDev = process.env.NODE_ENV === "development";
+      const dbPath = isDev
+        ? path.join(__dirname, "../../novy.sqlite")
+        : path.join(app.getPath("userData"), "novy.sqlite");
+
+      if (!fs.existsSync(dbPath)) {
+        return { success: false, message: "No database found to backup" };
+      }
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const backupName = `backup_${timestamp}.sqlite`;
+      const backupPath = path.join(BACKUP_DIR, backupName);
+
+      fs.copyFileSync(dbPath, backupPath);
+
+      // Clean old backups (keep last 10)
+      const files = fs
+        .readdirSync(BACKUP_DIR)
+        .filter((f) => f.startsWith("backup_") && f.endsWith(".sqlite"))
+        .sort((a, b) => {
+          return (
+            fs.statSync(path.join(BACKUP_DIR, b)).mtime.getTime() -
+            fs.statSync(path.join(BACKUP_DIR, a)).mtime.getTime()
+          );
+        });
+
+      if (files.length > 10) {
+        files.slice(10).forEach((f) => fs.unlinkSync(path.join(BACKUP_DIR, f)));
+      }
+
+      return { success: true, path: backupPath };
+    } catch (error) {
+      console.error("Backup error:", error);
+      return { success: false, message: error.message };
+    }
+  });
+
+  // Listar Backups
+  ipcMain.handle("list-backups", async () => {
+    try {
+      const files = fs
+        .readdirSync(BACKUP_DIR)
+        .filter((f) => f.startsWith("backup_") && f.endsWith(".sqlite"))
+        .map((f) => {
+          const stats = fs.statSync(path.join(BACKUP_DIR, f));
+          return {
+            name: f,
+            path: path.join(BACKUP_DIR, f),
+            size: stats.size,
+            date: stats.mtime,
+          };
+        })
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+      return { success: true, backups: files };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  });
+
+  // Restaurar Backup (Peligroso)
+  ipcMain.handle("restore-backup", async (event, backupFileName) => {
+    try {
+      const { app } = require("electron");
+      const isDev = process.env.NODE_ENV === "development";
+      const dbPath = isDev
+        ? path.join(__dirname, "../../novy.sqlite")
+        : path.join(app.getPath("userData"), "novy.sqlite");
+
+      const backupPath = path.join(BACKUP_DIR, backupFileName);
+
+      if (!fs.existsSync(backupPath)) {
+        return { success: false, message: "Backup file not found" };
+      }
+
+      // Close DB connection if possible...
+      // SQL.js usually loads in memory in 'initDatabase' but if we are just copying file:
+      // Since we use SQL.js on a FILE, we might have file locks?
+      // In 'db.js', we load `new SQL.Database(filebuffer)`. We don't hold a lock on the file constantly
+      // UNLESS we are in the middle of writing with `saveDatabase`.
+      // `saveDatabase` writes `fs.writeFileSync(dbPath, data);`.
+      // So copying OVER it should be fine as long as no write is happening.
+
+      fs.copyFileSync(backupPath, dbPath);
+
+      // Force Reload Application to reload DB from file
+      app.relaunch();
+      app.exit(0);
+
+      return { success: true };
+    } catch (error) {
+      console.error("Restore error:", error);
+      return { success: false, message: error.message };
     }
   });
 }

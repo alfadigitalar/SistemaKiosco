@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Shield,
+  BarChart3,
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import ConfirmationModal from "./ConfirmationModal";
@@ -159,6 +160,14 @@ export default function MainLayout() {
             <History size={20} className="shrink-0" />{" "}
             {!isCollapsed && "Historial Ventas"}
           </Link>
+          <Link
+            to="/reportes"
+            className={getLinkClass("/reportes")}
+            title="Reportes Avanzados"
+          >
+            <BarChart3 size={20} className="shrink-0" />{" "}
+            {!isCollapsed && "Reportes"}
+          </Link>
 
           <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-700">
             <Link
@@ -173,6 +182,38 @@ export default function MainLayout() {
         </nav>
 
         <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+          {/* User Profile Section */}
+          <div
+            className={`flex items-center gap-3 mb-4 ${
+              isCollapsed ? "justify-center" : ""
+            }`}
+          >
+            <div className="relative shrink-0">
+              {user.profile_picture ? (
+                <img
+                  src={user.profile_picture}
+                  alt="Perfil"
+                  className="w-10 h-10 rounded-full object-cover border-2 border-slate-200 dark:border-slate-600"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400">
+                  <Users size={20} />
+                </div>
+              )}
+            </div>
+
+            {!isCollapsed && (
+              <div className="overflow-hidden">
+                <p className="font-bold text-sm truncate text-slate-700 dark:text-slate-200">
+                  {user.name ? user.name.split(" ")[0] : "Usuario"}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate capitalize">
+                  {user.role === "admin" ? "Administrador" : "Empleado"}
+                </p>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={cerrarSesion}
             className={`flex items-center gap-3 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 w-full p-2 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition font-medium whitespace-nowrap overflow-hidden ${

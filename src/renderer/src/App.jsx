@@ -19,6 +19,7 @@ import ProveedoresScreen from "./screens/ProveedoresScreen";
 import { ConfigProvider } from "./context/ConfigContext";
 import UsersScreen from "./screens/UsersScreen";
 import ConfiguracionScreen from "./screens/ConfiguracionScreen";
+import ReportesScreen from "./screens/ReportesScreen";
 
 // Componentes Placeholder para secciones futuras
 
@@ -29,16 +30,43 @@ function App() {
         <ConfigProvider>
           <ErrorBoundary>
             <Toaster
-              position="top-right"
+              position="top-center"
+              reverseOrder={false}
+              gutter={8}
+              containerClassName=""
               containerStyle={{
-                top: 40,
-                left: 20,
-                bottom: 20,
-                right: 20,
-                zIndex: 99999,
+                zIndex: 999999,
               }}
               toastOptions={{
-                style: { background: "#334155", color: "#fff" },
+                className: "",
+                duration: 5000,
+                style: {
+                  background: "#1e293b",
+                  color: "#fff",
+                  padding: "16px",
+                  borderRadius: "12px",
+                  fontSize: "16px",
+                  boxShadow:
+                    "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+                },
+                success: {
+                  style: {
+                    background: "#10b981",
+                  },
+                  iconTheme: {
+                    primary: "#fff",
+                    secondary: "#10b981",
+                  },
+                },
+                error: {
+                  style: {
+                    background: "#ef4444",
+                  },
+                  iconTheme: {
+                    primary: "#fff",
+                    secondary: "#ef4444",
+                  },
+                },
               }}
             />
             <Routes>
@@ -65,6 +93,7 @@ function App() {
                   path="/configuracion"
                   element={<ConfiguracionScreen />}
                 />
+                <Route path="/reportes" element={<ReportesScreen />} />
               </Route>
             </Routes>
           </ErrorBoundary>

@@ -278,38 +278,50 @@
                     startBtn.style.display = 'none';
                     logError("Cámara iniciada correctamente.");
 
-                    // Check for Torch/Flash support
-                    // Wait a bit for camera to fully initialize capabilities
-                    setTimeout(() => {
-                        try {
-                            const capabilities = html5QrCode.getRunningTrackCameraCapabilities();
-                            if (capabilities.torch) {
-                                flashBtn.style.display = 'flex'; // Show flex to center icon
-                                let isFlashOn = false;
+                    // Optimistic Flash Button
+                    flashBtn.style.display = 'flex';
+                    let isFlashOn = false;
 
-                                flashBtn.addEventListener('click', () => {
-                                    isFlashOn = !isFlashOn;
-                                    html5QrCode.applyVideoConstraints({
-                                        advanced: [{ torch: isFlashOn }]
-                                    })
-                                        .then(() => {
-                                            if (isFlashOn) {
-                                                flashBtn.classList.add('active');
-                                            } else {
-                                                flashBtn.classList.remove('active');
-                                            }
-                                        })
-                                        .catch(err => {
-                                            logError("Error Flash: " + err);
-                                        });
-                                });
-                            } else {
-                                logError("Este dispositivo no reporta soporte de linterna (torch).");
+                    // Remove previous listeners
+                    const newFlashBtn = flashBtn.cloneNode(true);
+                    flashBtn.parentNode.replaceChild(newFlashBtn, flashBtn);
+                    const currentFlashBtn = document.getElementById('overlayFlash');
+
+                    currentFlashBtn.addEventListener('click', async () => {
+                        try {
+                            const videoEl = document.querySelector("#reader video");
+                            if (!videoEl || !videoEl.srcObject) {
+                                throw new Error("No se encontró el video del scanner.");
                             }
-                        } catch (e) {
-                            logError("No se pudo verificar soporte de Flash: " + e);
+
+                            const stream = videoEl.srcObject;
+                            const track = stream.getVideoTracks()[0];
+
+                            if (!track) {
+                                throw new Error("No hay track de video activo.");
+                            }
+
+                            // Debug capabilities
+                            const caps = track.getCapabilities ? track.getCapabilities() : {};
+                            logError("Caps: " + JSON.stringify(caps));
+
+                            isFlashOn = !isFlashOn;
+
+                            // Intentar método estándar (Advanced)
+                            await track.applyConstraints({
+                                advanced: [{ torch: isFlashOn }]
+                            });
+
+                            if (isFlashOn) currentFlashBtn.classList.add('active');
+                            else currentFlashBtn.classList.remove('active');
+
+                        } catch (err) {
+                            logError("Error Nativo Flash: " + err);
+                            // Fallback para propiedades no estándar (algunos Android viejos)
+                            // isFlashOn = !isFlashOn; // Revertir estado visual si queremos
+                            // alert("Error al activar flash: " + err.message);
                         }
-                    }, 500);
+                    });
 
                 } else {
                     logError("No se detectaron cámaras.");
