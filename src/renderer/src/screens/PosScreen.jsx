@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 import PaymentModal from "../components/PaymentModal";
 import CustomerSearch from "../components/CustomerSearch";
+import WeightModal from "../components/WeightModal";
 
 /**
  * Pantalla Principal de Punto de Venta (POS)
@@ -40,6 +41,10 @@ export default function PosScreen() {
   // Cliente State
   const [clientes, setClientes] = useState([]);
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
+
+  // Modal Pesaje
+  const [weightModalOpen, setWeightModalOpen] = useState(false);
+  const [pendingWeighableProduct, setPendingWeighableProduct] = useState(null);
 
   const inputRef = useRef(null);
   const navigate = useNavigate();
@@ -207,9 +212,31 @@ export default function PosScreen() {
   const [inputCantidad, setInputCantidad] = useState(1);
 
   // Agregar producto al carrito (o incrementar cantidad si ya existe)
-  const agregarAlCarrito = (producto) => {
-    // Validar cantidad manual
-    const cantidadToAdd = parseFloat(inputCantidad);
+  // quantityOverride: Opcional, forzar una cantidad específica (usado por el modal de peso)
+  const agregarAlCarrito = (producto, quantityOverride = null) => {
+    // 1. Detección de Producto Pesable (Intercepción)
+    // Si NO se paso una cantidad forzada (quantityOverride) y el producto NO es unidad...
+    if (
+      quantityOverride === null &&
+      producto.measurement_unit &&
+      producto.measurement_unit !== "un"
+    ) {
+      // ... abrir modal de pesaje y detener flujo normal
+      setPendingWeighableProduct(producto);
+      setWeightModalOpen(true);
+      return;
+    }
+
+    // 2. Determinar Cantidad a Agregar
+    let cantidadToAdd;
+    if (quantityOverride !== null) {
+      cantidadToAdd = parseFloat(quantityOverride);
+    } else {
+      // Flujo normal (Unidad)
+      cantidadToAdd = parseFloat(inputCantidad);
+    }
+
+    // Validar cantidad
     if (isNaN(cantidadToAdd) || cantidadToAdd <= 0) {
       toast.error("La cantidad debe ser mayor a 0");
       return;
@@ -260,8 +287,10 @@ export default function PosScreen() {
       return [...prev, { ...producto, cantidad: cantidadToAdd }];
     });
 
-    // Resetear cantidad a 1 por defecto (UX standard)
-    setInputCantidad(1);
+    // Resetear cantidad a 1 por defecto (Solo si no fue pesable, por UX)
+    if (quantityOverride === null) {
+      setInputCantidad(1);
+    }
   };
 
   // Eliminar producto del carrito
@@ -380,6 +409,22 @@ export default function PosScreen() {
         total={total}
         onConfirm={procesarPago}
         clientName={clienteSeleccionado ? clienteSeleccionado.name : null}
+      />
+
+      <WeightModal
+        isOpen={weightModalOpen}
+        onClose={() => {
+          setWeightModalOpen(false);
+          setPendingWeighableProduct(null);
+          // Devolver foto al input principal
+          setTimeout(() => inputRef.current?.focus(), 100);
+        }}
+        product={pendingWeighableProduct}
+        onConfirm={(qty) => {
+          if (pendingWeighableProduct) {
+            agregarAlCarrito(pendingWeighableProduct, qty);
+          }
+        }}
       />
 
       {/* ════════════════════════════════════════════════════════ */}

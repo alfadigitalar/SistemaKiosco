@@ -189,6 +189,18 @@ Asegurar que las ventas registren la fecha/hora local correcta y el usuario real
 
 - Display unit next to price/qty (e.g. "250 gr", "1.5 kg").
 
+### Frontend (`src/renderer/src/components/WeightModal.jsx`)
+
+- Modal that pops up for non-unit products.
+- Inputs: Quantity (number) and Unit (buttons: Kg, Gr).
+- Logic: If user selects Gr, divide by 1000 before returning to POS.
+
+### Frontend (`src/renderer/src/screens/PosScreen.jsx`)
+
+- Refactor `agregarAlCarrito`:
+  - If `measurement_unit === 'un'`, add directly.
+  - Else, open `WeightModal`.
+
 ---
 
 ## 🚀 Estado Actual
@@ -213,6 +225,7 @@ Asegurar que las ventas registren la fecha/hora local correcta y el usuario real
 | 20   | Cantidades Fraccionables        | ✅     |
 | 21   | Análisis de Ganancias           | ✅     |
 | 22   | Unidades de Medida              | ✅     |
+| 23   | Modal de Pesaje (Smart Weight)  | ✅     |
 
 **Repositorio:** https://github.com/alfadigitalar/SistemaKiosco
 
