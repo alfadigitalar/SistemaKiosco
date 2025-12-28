@@ -300,6 +300,22 @@ function createTables() {
       user_id INTEGER,
       FOREIGN KEY(user_id) REFERENCES users(id)
     );
+
+    -- ═══════════════════════════════════════════════════════════
+    -- TABLA: MOVIMIENTOS DE STOCK (AUDITORÍA DE PRODUCTOS)
+    -- Registro de cambios de inventario (Entradas, Salidas, Ajustes)
+    -- ═══════════════════════════════════════════════════════════
+    CREATE TABLE IF NOT EXISTS stock_movements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL,
+      type TEXT NOT NULL CHECK(type IN ('purchase', 'adjustment_add', 'adjustment_sub', 'sale', 'loss', 'return')),
+      quantity REAL NOT NULL,
+      reason TEXT,
+      user_id INTEGER,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(product_id) REFERENCES products(id),
+      FOREIGN KEY(user_id) REFERENCES users(id)
+    );
   `;
 
   try {

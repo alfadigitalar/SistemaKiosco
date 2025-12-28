@@ -15,6 +15,7 @@ import {
   Shield,
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
+import ConfirmationModal from "./ConfirmationModal";
 
 export default function MainLayout() {
   const navigate = useNavigate();
@@ -31,8 +32,24 @@ export default function MainLayout() {
   }
   const isAdmin = user?.role === "admin";
 
-  const cerrarSesion = () => {
-    navigate("/"); // Volver al login
+  // State for Security Modal
+  const [showLogoutBlocker, setShowLogoutBlocker] = useState(false);
+
+  const cerrarSesion = async () => {
+    try {
+      const session = await window.api.getCurrentSession();
+      if (session) {
+        // Caja abierta: Mostrar modal de bloqueo
+        setShowLogoutBlocker(true);
+      } else {
+        // Caja cerrada: Permitir salir
+        localStorage.removeItem("user");
+        navigate("/");
+      }
+    } catch (error) {
+      console.error(error);
+      navigate("/");
+    }
   };
 
   const theme = getThemeClasses(); // Obtener clases del tema actual
@@ -172,6 +189,18 @@ export default function MainLayout() {
       <main className="flex-1 overflow-hidden relative">
         <Outlet />
       </main>
+
+      {/* Modal de Bloqueo de Salida */}
+      <ConfirmationModal
+        isOpen={showLogoutBlocker}
+        onClose={() => setShowLogoutBlocker(false)}
+        onConfirm={() => navigate("/caja")}
+        title="⚠️ No es posible salir"
+        message="Tiene una CAJA ABIERTA en este momento. Por razones de seguridad, debe cerrar la caja antes de salir del sistema."
+        confirmText="Ir a Cerrar Caja"
+        cancelText="Entendido"
+        isDestructive={true}
+      />
     </div>
   );
 }

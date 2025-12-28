@@ -8,8 +8,10 @@ import {
   AlertTriangle,
   X,
   Barcode,
+  History,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import StockDetailModal from "../components/StockDetailModal";
 
 const InventarioScreen = () => {
   const [products, setProducts] = useState([]);
@@ -20,6 +22,10 @@ const InventarioScreen = () => {
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState(null);
+
+  // Stock Control Modal
+  const [stockModalOpen, setStockModalOpen] = useState(false);
+  const [selectedProductForStock, setSelectedProductForStock] = useState(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -309,6 +315,16 @@ const InventarioScreen = () => {
                   </td>
                   <td className="p-4 flex justify-center gap-2">
                     <button
+                      title="Historial de Stock"
+                      onClick={() => {
+                        setSelectedProductForStock(product);
+                        setStockModalOpen(true);
+                      }}
+                      className="p-2 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+                    >
+                      <History size={18} />
+                    </button>
+                    <button
                       title="Editar"
                       onClick={() => handleOpenModal(product)}
                       className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
@@ -517,6 +533,15 @@ const InventarioScreen = () => {
           </div>
         </div>
       )}
+      {/* Modal Control de Stock */}
+      <StockDetailModal
+        isOpen={stockModalOpen}
+        onClose={() => setStockModalOpen(false)}
+        product={selectedProductForStock}
+        onStockUpdate={() => {
+          fetchProducts(); // Recargar tabla principal para ver stock actualizado
+        }}
+      />
     </div>
   );
 };

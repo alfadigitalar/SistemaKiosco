@@ -58,9 +58,24 @@ export default function PosScreen() {
     localStorage.setItem("cart_backup", JSON.stringify(carrito));
   }, [carrito]);
 
-  // Mantener el foco en el input al montar
+  // Verificar Sesión de Caja
+  const [isSessionClosed, setIsSessionClosed] = useState(false);
+
   useEffect(() => {
     inputRef.current?.focus();
+
+    const checkSession = async () => {
+      try {
+        const session = await window.api.getCurrentSession();
+        if (!session) {
+          setIsSessionClosed(true);
+          toast.error("⚠️ LA CAJA ESTÁ CERRADA. No puede realizar ventas.");
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    checkSession();
 
     // Cargar clientes
     const loadCustomers = async () => {
@@ -73,9 +88,6 @@ export default function PosScreen() {
       }
     };
     loadCustomers();
-    // Se eliminó el listener de click global que robaba el foco
-    // window.addEventListener("click", focusInput);
-    // return () => window.removeEventListener("click", focusInput);
   }, []);
 
   const [showScannerModal, setShowScannerModal] = useState(false);
@@ -401,7 +413,6 @@ export default function PosScreen() {
           style: { background: "#334155", color: "#fff" },
         }}
       />
-
       {/* Modal de Pago */}
       <PaymentModal
         isOpen={modalPagoAbierto}
@@ -410,7 +421,6 @@ export default function PosScreen() {
         onConfirm={procesarPago}
         clientName={clienteSeleccionado ? clienteSeleccionado.name : null}
       />
-
       <WeightModal
         isOpen={weightModalOpen}
         onClose={() => {
@@ -426,7 +436,6 @@ export default function PosScreen() {
           }
         }}
       />
-
       {/* ════════════════════════════════════════════════════════ */}
       {/* SECCIÓN IZQUIERDA: LISTA DE PRODUCTOS */}
       {/* ════════════════════════════════════════════════════════ */}
@@ -638,7 +647,6 @@ export default function PosScreen() {
           </button>
         </div>
       </div>
-
       {/* ════════════════════════════════════════════════════════ */}
       {/* SECCIÓN DERECHA: TOTALES Y ACCIONES */}
       {/* ════════════════════════════════════════════════════════ */}
@@ -715,6 +723,29 @@ export default function PosScreen() {
           </div>
         </div>
       </div>
+
+      {/* BLOQUEO POR CAJA CERRADA */}
+      {isSessionClosed && (
+        <div className="fixed inset-0 z-[9999] bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl max-w-md text-center shadow-2xl border-4 border-red-500">
+            <div className="w-24 h-24 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertTriangle size={48} className="text-red-500" />
+            </div>
+            <h2 className="text-3xl font-black text-slate-800 dark:text-white mb-4">
+              ¡CAJA CERRADA!
+            </h2>
+            <p className="text-slate-500 dark:text-slate-400 text-lg mb-8">
+              No es posible realizar ventas sin abrir la caja primero.
+            </p>
+            <button
+              onClick={() => navigate("/caja")}
+              className="w-full py-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xl shadow-xl hover:scale-105 transition-all"
+            >
+              IR A ABRIR CAJA
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

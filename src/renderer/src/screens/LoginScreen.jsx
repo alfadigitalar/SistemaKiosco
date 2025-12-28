@@ -34,10 +34,21 @@ const LoginScreen = () => {
           })
         );
 
-        // Navigate to POS
-        setTimeout(() => {
-          navigate("/pos");
-        }, 1000);
+        // Check status of cash session
+        try {
+          const session = await window.api.getCurrentSession();
+          if (session) {
+            // Session active -> Go to Dashboard
+            setTimeout(() => navigate("/dashboard"), 1000);
+          } else {
+            // Session closed -> Go to Cash Screen to open it
+            setTimeout(() => navigate("/caja"), 1000);
+          }
+        } catch (error) {
+          console.error("Error checking session:", error);
+          // Fallback
+          setTimeout(() => navigate("/dashboard"), 1000);
+        }
       } else {
         toast.error(result.message || "Login failed");
       }

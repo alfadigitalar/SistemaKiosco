@@ -893,6 +893,59 @@ function registerIpcHandlers() {
       return { success: false, message: error.message };
     }
   });
+
+  // ═══════════════════════════════════════════════════════════
+  // HANDLERS DE CONTROL DE STOCK
+  // ═══════════════════════════════════════════════════════════
+
+  // Registrar movimiento de stock y actualizar inventario
+  ipcMain.handle("add-stock-movement", async (event, movement) => {
+    try {
+      const { product_id, type, quantity, reason, user_id } = movement;
+
+      // 1. Registrar Movimiento
+      await run(
+        "INSERT INTO stock_movements (product_id, type, quantity, reason, user_id) VALUES (?, ?, ?, ?, ?)",
+        [product_id, type, quantity, reason, user_id]
+      );
+
+      // 2. Actualizar Stock del Producto
+      // Si es entrada (purchase, adjustment_add, return) -> SUMA
+      // Si es salida (sale, adjustment_sub, loss) -> RESTA
+      let operator = "+";
+      if (["sale", "adjustment_sub", "loss"].includes(type)) {
+        operator = "-";
+      }
+
+      await run(
+        `UPDATE products SET stock_quantity = stock_quantity ${operator} ? WHERE id = ?`,
+        [quantity, product_id]
+      );
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error al registrar movimiento:", error);
+      return { success: false, message: error.message };
+    }
+  });
+
+  // Obtener historial de movimientos de un producto
+  ipcMain.handle("get-stock-movements", async (event, productId) => {
+    try {
+      const rows = await all(
+        `SELECT sm.*, u.name as user_name 
+         FROM stock_movements sm
+         LEFT JOIN users u ON sm.user_id = u.id
+         WHERE sm.product_id = ?
+         ORDER BY sm.timestamp DESC`,
+        [productId]
+      );
+      return rows;
+    } catch (error) {
+      console.error("Error al obtener movimientos:", error);
+      return [];
+    }
+  });
 }
 
 module.exports = { registerIpcHandlers };

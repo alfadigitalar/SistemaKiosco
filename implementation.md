@@ -226,6 +226,7 @@ Asegurar que las ventas registren la fecha/hora local correcta y el usuario real
 | 21   | Análisis de Ganancias           | ✅     |
 | 22   | Unidades de Medida              | ✅     |
 | 23   | Modal de Pesaje (Smart Weight)  | ✅     |
+| 24   | Control de Stock Avanzado       | ⏳     |
 
 **Repositorio:** https://github.com/alfadigitalar/SistemaKiosco
 

@@ -3,6 +3,7 @@ import autoTable from "jspdf-autotable";
 import ConfirmationModal from "../components/ConfirmationModal";
 import { useConfig } from "../context/ConfigContext";
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   DollarSign,
   Archive,
@@ -15,6 +16,7 @@ import { toast } from "react-hot-toast";
 
 const CajaScreen = () => {
   const { kioskName, kioskAddress } = useConfig();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
   const [summary, setSummary] = useState(null);
@@ -164,11 +166,18 @@ const CajaScreen = () => {
 
       if (result.success) {
         toast.success("Caja abierta correctamente");
+
+        // Redirigir al Dashboard una vez abierta
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 500);
+
         setRefreshKey((prev) => prev + 1);
       } else {
         toast.error(result.message);
       }
     } catch (error) {
+      console.error(error);
       toast.error("Error de conexión");
     }
   };
