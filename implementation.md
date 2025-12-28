@@ -1,7 +1,7 @@
 # Plan de Implementación - Sistema POS "Novy"
 
 > [!NOTE] > **Cambio de Estrategia:** Migrado a **`sql.js`** (JavaScript puro) debido a dificultades de compilación de librerías nativas en Windows.
- 
+
 ---
 
 ## 📋 Requisitos Técnicos (Stack)
@@ -176,6 +176,19 @@ Asegurar que las ventas registren la fecha/hora local correcta y el usuario real
 
 1.  **Obtener Usuario Real**: Leer `user` desde `localStorage` y enviar su `id` al crear la venta.
 
+### Backend (`src/main/db.js` & `ipcHandlers.js`)
+
+- Add `measurement_unit` column to `products` (default 'un').
+- Update handlers to save/read this field.
+
+### Frontend (`src/renderer/src/screens/InventarioScreen.jsx`)
+
+- Add dropdown in Product Modal: "Unidad", "Kg", "Gr", "L".
+
+### Frontend (`src/renderer/src/screens/PosScreen.jsx`)
+
+- Display unit next to price/qty (e.g. "250 gr", "1.5 kg").
+
 ---
 
 ## 🚀 Estado Actual
@@ -199,5 +212,10 @@ Asegurar que las ventas registren la fecha/hora local correcta y el usuario real
 | 19   | Persistencia Carrito + Buscador | ✅     |
 | 20   | Cantidades Fraccionables        | ✅     |
 | 21   | Análisis de Ganancias           | ✅     |
+| 22   | Unidades de Medida              | ✅     |
 
 **Repositorio:** https://github.com/alfadigitalar/SistemaKiosco
+
+```
+
+```

@@ -77,6 +77,15 @@ async function initDatabase() {
       // Column likely exists
     }
 
+    // MIGRATION: Add measurement_unit to products (Fase 22)
+    try {
+      db.run(
+        "ALTER TABLE products ADD COLUMN measurement_unit TEXT DEFAULT 'un'"
+      );
+    } catch (e) {
+      // Column likely exists
+    }
+
     // MIGRACIÓN MANUAL: Tabla Settings (Fase 10)
     db.run(`
       CREATE TABLE IF NOT EXISTS settings (
@@ -227,12 +236,13 @@ function createTables() {
       stock_quantity INTEGER DEFAULT 0,
       min_stock INTEGER DEFAULT 5,
       category_id INTEGER,
+      measurement_unit TEXT DEFAULT 'un',
       is_active INTEGER DEFAULT 1
     );
     
     -- Producto de prueba para test inicial
-    INSERT OR IGNORE INTO products (barcode, name, cost_price, sale_price, stock_quantity)
-    VALUES ('123456', 'Coca Cola 2.25L - PRUEBA', 1500, 2500, 50);
+    INSERT OR IGNORE INTO products (barcode, name, cost_price, sale_price, stock_quantity, measurement_unit)
+    VALUES ('123456', 'Coca Cola 2.25L - PRUEBA', 1500, 2500, 50, 'un');
 
     -- ═══════════════════════════════════════════════════════════
     -- TABLA: CLIENTES

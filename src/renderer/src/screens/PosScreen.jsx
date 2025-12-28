@@ -427,8 +427,14 @@ export default function PosScreen() {
                   </button>
                 </div>
                 <div className="col-span-5 truncate">
-                  <div className="font-medium text-slate-800 dark:text-white text-lg">
+                  <div className="font-medium text-slate-800 dark:text-white text-lg flex items-center gap-2">
                     {item.name}
+                    {item.measurement_unit &&
+                      item.measurement_unit !== "un" && (
+                        <span className="text-xs font-bold text-purple-600 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 px-1.5 py-0.5 rounded">
+                          {item.measurement_unit}
+                        </span>
+                      )}
                   </div>
                   <div className="text-xs text-slate-500 dark:text-slate-400">
                     {item.barcode}
@@ -497,7 +503,7 @@ export default function PosScreen() {
           {/* Input de Cantidad Manual */}
           <div className="relative w-28">
             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none select-none">
-              QTY
+              Cant.
             </div>
             <input
               type="number"
@@ -557,6 +563,12 @@ export default function PosScreen() {
                     <div>
                       <p className="font-bold text-slate-800 dark:text-white">
                         {prod.name}
+                        {prod.measurement_unit &&
+                          prod.measurement_unit !== "un" && (
+                            <span className="ml-2 text-xs font-normal text-slate-500 bg-slate-100 dark:bg-slate-700 px-1 rounded">
+                              {prod.measurement_unit}
+                            </span>
+                          )}
                       </p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
                         Cod: {prod.barcode}

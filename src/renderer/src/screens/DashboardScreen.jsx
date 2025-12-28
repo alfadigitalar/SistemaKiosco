@@ -14,9 +14,13 @@ const DashboardScreen = () => {
   // Profit Stats
   const [profitToday, setProfitToday] = useState(null);
   const [profitMonth, setProfitMonth] = useState(null);
-  const [customDate, setCustomDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const [customDate, setCustomDate] = useState(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  });
   const [customProfit, setCustomProfit] = useState(null);
 
   useEffect(() => {
@@ -25,8 +29,17 @@ const DashboardScreen = () => {
         const data = await window.api.getDashboardStats();
         setStats(data);
 
+        // Helper for Local YYYY-MM-DD
+        const getLocalISO = () => {
+          const now = new Date();
+          const year = now.getFullYear();
+          const month = String(now.getMonth() + 1).padStart(2, "0");
+          const day = String(now.getDate()).padStart(2, "0");
+          return `${year}-${month}-${day}`;
+        };
+
         // Fetch Profit Today
-        const todayStr = new Date().toISOString().split("T")[0];
+        const todayStr = getLocalISO();
         const todayStats = await window.api.getProfitStats({
           startDate: todayStr,
           endDate: todayStr,
@@ -35,20 +48,31 @@ const DashboardScreen = () => {
 
         // Fetch Profit Month
         const date = new Date();
-        const firstDay = new Date(date.getFullYear(), date.getMonth(), 1)
-          .toISOString()
-          .split("T")[0];
-        const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0)
-          .toISOString()
-          .split("T")[0];
+        const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
+        const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+
+        // Format dates manually to avoid UTC shift
+        const fYear = firstDay.getFullYear();
+        const fMonth = String(firstDay.getMonth() + 1).padStart(2, "0");
+        const fDay = String(firstDay.getDate()).padStart(2, "0");
+        const firstDayStr = `${fYear}-${fMonth}-${fDay}`;
+
+        const lYear = lastDay.getFullYear();
+        const lMonth = String(lastDay.getMonth() + 1).padStart(2, "0");
+        const lDay = String(lastDay.getDate()).padStart(2, "0");
+        const lastDayStr = `${lYear}-${lMonth}-${lDay}`;
+
         const monthStats = await window.api.getProfitStats({
-          startDate: firstDay,
-          endDate: lastDay,
+          startDate: firstDayStr,
+          endDate: lastDayStr,
         });
         setProfitMonth(monthStats);
 
         // Fetch Initial Custom (Today)
         setCustomProfit(todayStats);
+
+        // Update Custom Date Picker to Local Today
+        setCustomDate(todayStr);
       } catch (error) {
         console.error("Error cargando dashboard:", error);
       } finally {

@@ -31,6 +31,7 @@ const InventarioScreen = () => {
     min_stock: "5",
     category_id: null,
     supplier_id: "",
+    measurement_unit: "un",
   });
 
   const barcodeInputRef = useRef(null);
@@ -87,6 +88,7 @@ const InventarioScreen = () => {
           min_stock: "5",
           category_id: null,
           supplier_id: "",
+          measurement_unit: "un",
         });
         setIsModalOpen(true);
         // Enfocar input (delay para render)
@@ -114,6 +116,7 @@ const InventarioScreen = () => {
         min_stock: product.min_stock,
         category_id: product.category_id,
         supplier_id: product.supplier_id || "",
+        measurement_unit: product.measurement_unit || "un",
       });
     } else {
       setCurrentProduct(null);
@@ -126,6 +129,7 @@ const InventarioScreen = () => {
         min_stock: "5",
         category_id: null,
         supplier_id: "",
+        measurement_unit: "un",
       });
     }
     setIsModalOpen(true);
@@ -416,6 +420,28 @@ const InventarioScreen = () => {
                       setFormData({ ...formData, min_stock: e.target.value })
                     }
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">
+                    Unidad de Medida
+                  </label>
+                  <select
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none transition-colors"
+                    value={formData.measurement_unit}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        measurement_unit: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="un">Unidad (un)</option>
+                    <option value="kg">Kilogramo (kg)</option>
+                    <option value="gr">Gramo (gr)</option>
+                    <option value="lt">Litro (l)</option>
+                    <option value="mt">Metro (m)</option>
+                  </select>
                 </div>
               </div>
 
