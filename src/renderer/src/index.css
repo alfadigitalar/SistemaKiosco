@@ -12,3 +12,44 @@ body,
   overflow: hidden;
   background-color: #0f172a; /* Slate-900 match */
 }
+
+/* Remove default arrows/spinners from input type=number */
+/* Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #94a3b8; /* Slate-400 */
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b; /* Slate-500 */
+}
+
+/* Dark mode overrides if needed, though Slate-400 works well on dark too */
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569; /* Slate-600 */
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #64748b; /* Slate-500 */
+}

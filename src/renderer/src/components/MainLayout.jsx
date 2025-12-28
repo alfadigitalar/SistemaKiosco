@@ -12,6 +12,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  Shield,
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 
@@ -19,6 +20,16 @@ export default function MainLayout() {
   const navigate = useNavigate();
   const { kioskName, getThemeClasses } = useConfig();
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Obtener usuario del almacenamiento local para verificar rol
+  let user = {};
+  try {
+    user = JSON.parse(localStorage.getItem("user") || "{}");
+  } catch (e) {
+    console.error("Error parsing user from localStorage", e);
+    localStorage.removeItem("user"); // Clear bad data
+  }
+  const isAdmin = user?.role === "admin";
 
   const cerrarSesion = () => {
     navigate("/"); // Volver al login
@@ -113,6 +124,16 @@ export default function MainLayout() {
             <Truck size={20} className="shrink-0" />{" "}
             {!isCollapsed && "Proveedores"}
           </Link>
+          {isAdmin && (
+            <Link
+              to="/usuarios"
+              className={getLinkClass("/usuarios")}
+              title="Gestión de Usuarios"
+            >
+              <Shield size={20} className="shrink-0" />{" "}
+              {!isCollapsed && "Usuarios"}
+            </Link>
+          )}
           <Link
             to="/historial"
             className={getLinkClass("/historial")}

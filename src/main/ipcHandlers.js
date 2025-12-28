@@ -697,19 +697,140 @@ function registerIpcHandlers() {
   // Login de usuario
   ipcMain.handle("login-user", async (event, { username, password }) => {
     try {
-      const user = await get(
-        "SELECT * FROM users WHERE username = ? AND password_hash = ?",
-        [username, password]
+      console.log(
+        `[LOGIN DEBUG] Intentando login con usuario: '${username}' y contraseña: '${password}'`
       );
 
-      if (user) {
+      // 1. Buscar usuario por nombre de usuario solamente
+      const user = await get("SELECT * FROM users WHERE username = ?", [
+        username,
+      ]);
+
+      if (!user) {
+        console.log(
+          `[LOGIN DEBUG] ❌ Usuario '${username}' NO encontrado en la base de datos.`
+        );
+
+        // DEBUG: Mostrar qué usuarios SÍ existen para comparar
+        const allUsers = await all("SELECT id, username FROM users");
+        console.log(
+          "[LOGIN DEBUG] Usuarios disponibles en DB:",
+          allUsers.map((u) => `"${u.username}"`)
+        );
+
+        return { success: false, message: "Usuario no encontrado" };
+      }
+
+      console.log(
+        `[LOGIN DEBUG] ✅ Usuario encontrado: ID=${user.id}, Nombre='${user.name}', Role='${user.role}'`
+      );
+      console.log(
+        `[LOGIN DEBUG] Contraseña almacenada en DB: '${user.password_hash}'`
+      );
+
+      // 2. Verificar contraseña (comparación directa de texto)
+      // Nota: SQLite es case-sensitive por defecto solo si no se cambia el collation,
+      // pero en JS la comparación === es estricta.
+      if (user.password_hash === password) {
+        console.log(`[LOGIN DEBUG] ✅ Contraseña CORRECTA.`);
         return { success: true, name: user.name, role: user.role, id: user.id };
       } else {
-        return { success: false, message: "Credenciales incorrectas" };
+        console.log(
+          `[LOGIN DEBUG] ❌ Contraseña INCORRECTA. La DB espera '${user.password_hash}' pero recibió '${password}'`
+        );
+        return { success: false, message: "Contraseña incorrecta" };
       }
     } catch (error) {
       console.error("Error de login:", error);
       return { success: false, message: "Error del servidor" };
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // HANDLERS DE GESTIÓN DE USUARIOS (CRUD)
+  // ═══════════════════════════════════════════════════════════
+
+  // Obtener todos los usuarios activos
+  ipcMain.handle("get-users", async () => {
+    try {
+      // Ocultamos el hash en la lista (opcional, pero buena práctica)
+      // Aunque para editar a veces se necesita saber si tiene pass.
+      const rows = await all(
+        "SELECT id, name, username, role, active FROM users WHERE active = 1 ORDER BY name ASC"
+      );
+      return rows;
+    } catch (error) {
+      console.error("Error al obtener usuarios:", error);
+      return [];
+    }
+  });
+
+  // Crear usuario
+  ipcMain.handle("create-user", async (event, userData) => {
+    try {
+      const { name, username, password, role } = userData;
+      // TODO: En el futuro, usar bcrypt para hashear password.
+      // Por ahora texto plano como el resto del sistema.
+      await run(
+        "INSERT INTO users (name, username, password_hash, role, active) VALUES (?, ?, ?, ?, 1)",
+        [name, username, password, role || "employee"]
+      );
+      return { success: true };
+    } catch (error) {
+      console.error("Error al crear usuario:", error);
+      if (error.message.includes("UNIQUE constraint failed")) {
+        return { success: false, message: "El nombre de usuario ya existe." };
+      }
+      return { success: false, message: error.message };
+    }
+  });
+
+  // Actualizar usuario
+  ipcMain.handle("update-user", async (event, userData) => {
+    try {
+      const { id, name, username, password, role } = userData;
+
+      if (password && password.trim() !== "") {
+        // Si viene password, actualizamos todo
+        await run(
+          "UPDATE users SET name=?, username=?, password_hash=?, role=? WHERE id=?",
+          [name, username, password, role, id]
+        );
+      } else {
+        // Si no, solo datos
+        await run("UPDATE users SET name=?, username=?, role=? WHERE id=?", [
+          name,
+          username,
+          role,
+          id,
+        ]);
+      }
+      return { success: true };
+    } catch (error) {
+      console.error("Error al actualizar usuario:", error);
+      if (error.message.includes("UNIQUE constraint failed")) {
+        return { success: false, message: "El nombre de usuario ya existe." };
+      }
+      return { success: false, message: error.message };
+    }
+  });
+
+  // Eliminar usuario (Soft Delete)
+  ipcMain.handle("delete-user", async (event, id) => {
+    try {
+      // Evitar borrar al admin principal (id 1 usualmente)
+      // O chequear nombre de usuario 'admin'
+      if (id === 1) {
+        return {
+          success: false,
+          message: "No se puede eliminar al Administrador principal.",
+        };
+      }
+      await run("UPDATE users SET active = 0 WHERE id = ?", [id]);
+      return { success: true };
+    } catch (error) {
+      console.error("Error al eliminar usuario:", error);
+      return { success: false, message: error.message };
     }
   });
 }

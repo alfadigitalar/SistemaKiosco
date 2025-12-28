@@ -17,6 +17,7 @@ import DashboardScreen from "./screens/DashboardScreen";
 import HistorialScreen from "./screens/HistorialScreen";
 import ProveedoresScreen from "./screens/ProveedoresScreen";
 import { ConfigProvider } from "./context/ConfigContext";
+import UsersScreen from "./screens/UsersScreen";
 import ConfiguracionScreen from "./screens/ConfiguracionScreen";
 
 // Componentes Placeholder para secciones futuras
@@ -58,6 +59,7 @@ function App() {
                 <Route path="/inventario" element={<InventarioScreen />} />
                 <Route path="/clientes" element={<CustomersScreen />} />
                 <Route path="/proveedores" element={<ProveedoresScreen />} />
+                <Route path="/usuarios" element={<UsersScreen />} />
                 <Route path="/historial" element={<HistorialScreen />} />
                 <Route
                   path="/configuracion"

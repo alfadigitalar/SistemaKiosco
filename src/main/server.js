@@ -99,6 +99,19 @@ function startServer(mainWindow) {
       console.log(`Scanner server running on https://${localIp}:${PORT}`);
     });
 
+    server.on("error", (e) => {
+      if (e.code === "EADDRINUSE") {
+        console.error(
+          `⚠️ PUERTO ${PORT} EN USO. El servidor de escáner no se pudo iniciar.`
+        );
+        console.error(
+          "Probablemente hay otra instancia de la aplicación abierta."
+        );
+      } else {
+        console.error("Error en servidor de escáner:", e);
+      }
+    });
+
     return { ip: localIp, port: PORT, url: `https://${localIp}:${PORT}` };
   } catch (error) {
     console.error(

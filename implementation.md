@@ -139,6 +139,28 @@
 - [x] Animaciones: Efecto `active:scale-95` en botones principales
 - [x] Toast Notifications visibles (Z-Index fix)
 
+## Fase 17: Gestión de Usuarios (Empleados)
+
+### Objetivo
+
+Permitir al administrador crear, editar y eliminar usuarios directamente desde el sistema para solucionar problemas de persistencia de datos con `sql.js`.
+
+### Backend (`src/main/ipcHandlers.js`)
+
+1.  **Get Users**: `ipcMain.handle("get-users")` -> `SELECT * FROM users`.
+2.  **Create User**: `ipcMain.handle("create-user")` -> `INSERT INTO users ...`.
+3.  **Update User**: `ipcMain.handle("update-user")` -> `UPDATE users ...`.
+4.  **Delete User**: `ipcMain.handle("delete-user")` -> `UPDATE users SET active = 0`.
+
+### Frontend
+
+1.  **Nueva Pantalla**: `src/renderer/src/screens/UsersScreen.jsx`.
+    - Tabla de usuarios.
+    - Modal de creación/edición.
+2.  **Navegación**:
+    - Agregar ruta `/users` en `App.jsx`.
+    - Agregar link en Sidebar (visible solo para admin).
+
 ---
 
 ## 🚀 Estado Actual
@@ -157,5 +179,6 @@
 | 10   | Configuración y Tema    | ✅     |
 | 11   | Escáner Móvil + Flash   | ✅     |
 | 12   | UI Polish + IP Fix      | ✅     |
+| 17   | Gestión de Usuarios     | 🔄     |
 
 **Repositorio:** https://github.com/alfadigitalar/SistemaKiosco

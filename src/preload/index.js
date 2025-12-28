@@ -90,6 +90,12 @@ contextBridge.exposeInMainWorld("api", {
   // Iniciar sesión
   loginUser: (credentials) => ipcRenderer.invoke("login-user", credentials),
 
+  // Gestión de Usuarios
+  getUsers: () => ipcRenderer.invoke("get-users"),
+  createUser: (data) => ipcRenderer.invoke("create-user", data),
+  updateUser: (data) => ipcRenderer.invoke("update-user", data),
+  deleteUser: (id) => ipcRenderer.invoke("delete-user", id),
+
   // ═══════════════════════════════════════════════════════════
   // ESCÁNER MÓVIL
   // ═══════════════════════════════════════════════════════════
