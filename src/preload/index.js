@@ -65,6 +65,7 @@ contextBridge.exposeInMainWorld("api", {
   // MÉTODOS DE ESTADÍSTICAS Y REPORTES
   // ═══════════════════════════════════════════════════════════
   getDashboardStats: () => ipcRenderer.invoke("get-dashboard-stats"),
+  getProfitStats: (filters) => ipcRenderer.invoke("get-profit-stats", filters),
   getSalesHistory: (filters) =>
     ipcRenderer.invoke("get-sales-history", filters),
   getSaleDetails: (saleId) => ipcRenderer.invoke("get-sale-details", saleId),

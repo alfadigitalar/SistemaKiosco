@@ -27,7 +27,11 @@ const LoginScreen = () => {
         // Save user to local storage if needed or global state
         localStorage.setItem(
           "user",
-          JSON.stringify({ name: result.name, role: result.role })
+          JSON.stringify({
+            id: result.id,
+            name: result.name,
+            role: result.role,
+          })
         );
 
         // Navigate to POS

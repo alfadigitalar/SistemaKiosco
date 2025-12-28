@@ -1,7 +1,7 @@
 # Plan de Implementación - Sistema POS "Novy"
 
 > [!NOTE] > **Cambio de Estrategia:** Migrado a **`sql.js`** (JavaScript puro) debido a dificultades de compilación de librerías nativas en Windows.
-
+ 
 ---
 
 ## 📋 Requisitos Técnicos (Stack)
@@ -161,24 +161,43 @@ Permitir al administrador crear, editar y eliminar usuarios directamente desde e
     - Agregar ruta `/users` en `App.jsx`.
     - Agregar link en Sidebar (visible solo para admin).
 
+## Fase 18: Corrección de Metadatos de Historial
+
+### Objetivo
+
+Asegurar que las ventas registren la fecha/hora local correcta y el usuario real que realizó la operación.
+
+### Backend (`src/main/ipcHandlers.js`)
+
+1.  **Timestamp Local**: Generar fecha en formato `YYYY-MM-DD HH:MM:SS` (Local) y enviarla en el INSERT de `sales`.
+2.  **User ID**: Asegurar que el `user_id` recibido se guarde correctamente.
+
+### Frontend (`src/renderer/src/screens/PosScreen.jsx`)
+
+1.  **Obtener Usuario Real**: Leer `user` desde `localStorage` y enviar su `id` al crear la venta.
+
 ---
 
 ## 🚀 Estado Actual
 
-| Fase | Descripción             | Estado |
-| ---- | ----------------------- | ------ |
-| 1    | Backend + SQLite        | ✅     |
-| 2    | UI + Login + Layout     | ✅     |
-| 3    | POS + Escáner + Carrito | ✅     |
-| 4    | Modal de Pago + Guardar | ✅     |
-| 5    | Clientes y Fiados       | ✅     |
-| 6    | Inventario CRUD         | ✅     |
-| 7    | Control de Caja         | ✅     |
-| 8    | Dashboard/Reportes      | ✅     |
-| 9    | Proveedores y Pedidos   | ✅     |
-| 10   | Configuración y Tema    | ✅     |
-| 11   | Escáner Móvil + Flash   | ✅     |
-| 12   | UI Polish + IP Fix      | ✅     |
-| 17   | Gestión de Usuarios     | 🔄     |
+| Fase | Descripción                     | Estado |
+| ---- | ------------------------------- | ------ |
+| 1    | Backend + SQLite                | ✅     |
+| 2    | UI + Login + Layout             | ✅     |
+| 3    | POS + Escáner + Carrito         | ✅     |
+| 4    | Modal de Pago + Guardar         | ✅     |
+| 5    | Clientes y Fiados               | ✅     |
+| 6    | Inventario CRUD                 | ✅     |
+| 7    | Control de Caja                 | ✅     |
+| 8    | Dashboard/Reportes              | ✅     |
+| 9    | Proveedores y Pedidos           | ✅     |
+| 10   | Configuración y Tema            | ✅     |
+| 11   | Escáner Móvil + Flash           | ✅     |
+| 12   | UI Polish + IP Fix              | ✅     |
+| 17   | Gestión de Usuarios             | ✅     |
+| 18   | Historial de Ventas (Metadata)  | ✅     |
+| 19   | Persistencia Carrito + Buscador | ✅     |
+| 20   | Cantidades Fraccionables        | ✅     |
+| 21   | Análisis de Ganancias           | ✅     |
 
 **Repositorio:** https://github.com/alfadigitalar/SistemaKiosco

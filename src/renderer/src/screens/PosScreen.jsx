@@ -12,6 +12,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 import PaymentModal from "../components/PaymentModal";
+import CustomerSearch from "../components/CustomerSearch";
 
 /**
  * Pantalla Principal de Punto de Venta (POS)
@@ -26,7 +27,11 @@ export default function PosScreen() {
   // ═══════════════════════════════════════════════════════════
   // ESTADO
   // ═══════════════════════════════════════════════════════════
-  const [carrito, setCarrito] = useState([]);
+  // Inicializar carrito desde localStorage si existe
+  const [carrito, setCarrito] = useState(() => {
+    const saved = localStorage.getItem("cart_backup");
+    return saved ? JSON.parse(saved) : [];
+  });
   const [codigo, setCodigo] = useState("");
   const [loading, setLoading] = useState(false);
   const [modalPagoAbierto, setModalPagoAbierto] = useState(false);
@@ -42,6 +47,11 @@ export default function PosScreen() {
   // ═══════════════════════════════════════════════════════════
   // EFECTOS
   // ═══════════════════════════════════════════════════════════
+
+  // Persistir carrito en cada cambio
+  useEffect(() => {
+    localStorage.setItem("cart_backup", JSON.stringify(carrito));
+  }, [carrito]);
 
   // Mantener el foco en el input al montar
   useEffect(() => {
@@ -194,16 +204,28 @@ export default function PosScreen() {
     }
   };
 
+  const [inputCantidad, setInputCantidad] = useState(1);
+
   // Agregar producto al carrito (o incrementar cantidad si ya existe)
   const agregarAlCarrito = (producto) => {
+    // Validar cantidad manual
+    const cantidadToAdd = parseFloat(inputCantidad);
+    if (isNaN(cantidadToAdd) || cantidadToAdd <= 0) {
+      toast.error("La cantidad debe ser mayor a 0");
+      return;
+    }
+
     setCarrito((prev) => {
       const existe = prev.find((p) => p.id === producto.id);
       const cantidadActual = existe ? existe.cantidad : 0;
-      const nuevaCantidad = cantidadActual + 1;
+      const nuevaCantidad = parseFloat(
+        (cantidadActual + cantidadToAdd).toFixed(3)
+      );
 
       // Validación de Stock
       if (nuevaCantidad > producto.stock_quantity) {
         toast.error(`Stock insuficiente (Max: ${producto.stock_quantity})`);
+        // Opcional: permitir agregar hasta el max? No, mejor abortar.
         return prev;
       }
 
@@ -235,8 +257,11 @@ export default function PosScreen() {
           p.id === producto.id ? { ...p, cantidad: nuevaCantidad } : p
         );
       }
-      return [...prev, { ...producto, cantidad: 1 }];
+      return [...prev, { ...producto, cantidad: cantidadToAdd }];
     });
+
+    // Resetear cantidad a 1 por defecto (UX standard)
+    setInputCantidad(1);
   };
 
   // Eliminar producto del carrito
@@ -249,6 +274,7 @@ export default function PosScreen() {
     if (carrito.length === 0) return;
     if (window.confirm("¿Seguro que deseas cancelar la venta actual?")) {
       setCarrito([]);
+      localStorage.removeItem("cart_backup");
     }
   };
 
@@ -313,7 +339,7 @@ export default function PosScreen() {
         items: carrito,
         total: total,
         paymentMethod: pagoData.metodo,
-        userId: 1, // TODO: Obtener del usuario logueado
+        userId: JSON.parse(localStorage.getItem("user") || "{}").id || 1, // Fallback a 1 si falla
         clientId: clienteSeleccionado ? clienteSeleccionado.id : null,
       };
 
@@ -323,6 +349,7 @@ export default function PosScreen() {
       if (resultado.success) {
         toast.success(`Venta #${resultado.saleId} completada`);
         setCarrito([]); // Limpiar carrito
+        localStorage.removeItem("cart_backup");
         setClienteSeleccionado(null); // Resetear cliente
         return { success: true };
       } else {
@@ -466,8 +493,29 @@ export default function PosScreen() {
           </div>
         )}
 
-        {/* Input de Escaneo (Footer Izquierdo) */}
         <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex gap-2 relative z-20">
+          {/* Input de Cantidad Manual */}
+          <div className="relative w-28">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none select-none">
+              QTY
+            </div>
+            <input
+              type="number"
+              min="0.001"
+              step="0.001"
+              value={inputCantidad}
+              onClick={(e) => e.target.select()}
+              onChange={(e) => setInputCantidad(e.target.value)}
+              className="w-full pl-10 pr-2 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl text-xl font-mono font-bold text-blue-600 dark:text-blue-400 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-sm text-center"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  inputRef.current?.focus(); // Salta al buscador al dar enter
+                }
+              }}
+            />
+          </div>
+
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
             <input
@@ -546,7 +594,8 @@ export default function PosScreen() {
           </div>
           <div className="flex justify-between items-center">
             <div className="font-bold text-lg text-slate-800 dark:text-white">
-              Administrador
+              {JSON.parse(localStorage.getItem("user") || "{}").name ||
+                "Administrador"}
             </div>
             <button
               onClick={() => navigate("/dashboard")}
@@ -559,25 +608,11 @@ export default function PosScreen() {
 
           {/* Selector de Cliente */}
           <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
-            <label className="text-xs text-slate-500 dark:text-slate-400 block mb-1">
-              Cliente (Opcional)
-            </label>
-            <select
-              value={clienteSeleccionado ? clienteSeleccionado.id : ""}
-              onChange={(e) => {
-                const clienteId = parseInt(e.target.value);
-                const cliente = clientes.find((c) => c.id === clienteId);
-                setClienteSeleccionado(cliente || null);
-              }}
-              className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-            >
-              <option value="">-- Cliente Casual --</option>
-              {clientes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            <CustomerSearch
+              customers={clientes}
+              selectedCustomer={clienteSeleccionado}
+              onSelect={setClienteSeleccionado}
+            />
           </div>
         </div>
 

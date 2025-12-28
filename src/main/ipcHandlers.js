@@ -168,11 +168,28 @@ function registerIpcHandlers() {
     try {
       const { items, total, paymentMethod, userId, clientId } = saleData;
 
+      // Generar timestamp LOCAL (YYYY-MM-DD HH:MM:SS)
+      // SQLite store dates as strings, defaulting to UTC. We want Local Time.
+      // Generar timestamp LOCAL (YYYY-MM-DD HH:MM:SS) usando el reloj del sistema
+      const now = new Date();
+      const localTimestamp =
+        now.getFullYear() +
+        "-" +
+        String(now.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(now.getDate()).padStart(2, "0") +
+        " " +
+        String(now.getHours()).padStart(2, "0") +
+        ":" +
+        String(now.getMinutes()).padStart(2, "0") +
+        ":" +
+        String(now.getSeconds()).padStart(2, "0");
+
       // 1. Insertar venta principal
       const insertResult = await run(
-        `INSERT INTO sales (user_id, client_id, total_amount, payment_method)
-         VALUES (?, ?, ?, ?)`,
-        [userId || 1, clientId || null, total, paymentMethod]
+        `INSERT INTO sales (user_id, client_id, total_amount, payment_method, timestamp)
+         VALUES (?, ?, ?, ?, ?)`,
+        [userId || 1, clientId || null, total, paymentMethod, localTimestamp]
       );
 
       // Obtener el ID de la venta recién creada
@@ -568,6 +585,45 @@ function registerIpcHandlers() {
     } catch (error) {
       console.error("Error al obtener historial:", error);
       return [];
+    }
+  });
+
+  // Obtener estadísticas de ganancias (Real Profit)
+  ipcMain.handle("get-profit-stats", async (event, { startDate, endDate }) => {
+    try {
+      let query = `
+        SELECT 
+          SUM((si.unit_price_at_sale - COALESCE(p.cost_price, 0)) * si.quantity) as total_profit,
+          SUM(si.unit_price_at_sale * si.quantity) as total_revenue,
+          SUM(COALESCE(p.cost_price, 0) * si.quantity) as total_cost
+        FROM sale_items si
+        LEFT JOIN products p ON si.product_id = p.id
+        LEFT JOIN sales s ON si.sale_id = s.id
+        WHERE 1=1
+      `;
+
+      const params = [];
+
+      if (startDate) {
+        // SQLite string comparison works for ISO dates
+        query += " AND s.timestamp >= ?";
+        params.push(startDate + " 00:00:00");
+      }
+      if (endDate) {
+        query += " AND s.timestamp <= ?";
+        params.push(endDate + " 23:59:59");
+      }
+
+      const result = await get(query, params);
+      // Ensure we return numbers, not nulls
+      return {
+        totalProfit: result && result.total_profit ? result.total_profit : 0,
+        totalRevenue: result && result.total_revenue ? result.total_revenue : 0,
+        totalCost: result && result.total_cost ? result.total_cost : 0,
+      };
+    } catch (error) {
+      console.error("Error al obtener ganancias:", error);
+      return { totalProfit: 0, totalRevenue: 0, totalCost: 0 };
     }
   });
 

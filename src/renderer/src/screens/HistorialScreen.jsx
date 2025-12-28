@@ -148,7 +148,15 @@ const HistorialScreen = () => {
                     #{sale.id}
                   </td>
                   <td className="p-4 text-sm text-slate-700 dark:text-white">
-                    {new Date(sale.timestamp).toLocaleString()}
+                    {new Date(sale.timestamp).toLocaleString("es-AR", {
+                      hour12: false,
+                      year: "numeric",
+                      month: "2-digit",
+                      day: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    })}
                   </td>
                   <td className="p-4 font-medium text-slate-800 dark:text-white">
                     {sale.client_name || (
@@ -193,7 +201,15 @@ const HistorialScreen = () => {
                   Detalle Venta #{selectedSale.id}
                 </h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  {new Date(selectedSale.timestamp).toLocaleString()}
+                  {new Date(selectedSale.timestamp).toLocaleString("es-AR", {
+                    hour12: false,
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  })}
                 </p>
               </div>
               <button
