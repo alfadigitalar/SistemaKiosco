@@ -31,6 +31,9 @@ contextBridge.exposeInMainWorld("api", {
   // Eliminar producto
   deleteProduct: (id) => ipcRenderer.invoke("delete-product", id),
 
+  // Promos
+  getPromoItems: (promoId) => ipcRenderer.invoke("get-promo-items", promoId),
+
   // Control de Stock Avanzado
   addStockMovement: (data) => ipcRenderer.invoke("add-stock-movement", data),
   getStockMovements: (productId) =>

@@ -361,10 +361,9 @@ export default function PosScreen() {
         (cantidadActual + cantidadToAdd).toFixed(3)
       );
 
-      // Validación de Stock
-      if (nuevaCantidad > producto.stock_quantity) {
+      // Validación de Stock (Solo si NO es promo)
+      if (!producto.is_promo && nuevaCantidad > producto.stock_quantity) {
         toast.error(`Stock insuficiente (Max: ${producto.stock_quantity})`);
-        // Opcional: permitir agregar hasta el max? No, mejor abortar.
         return prev;
       }
 
@@ -374,18 +373,23 @@ export default function PosScreen() {
         toast(
           (t) => (
             <div className="flex items-center gap-2">
-              <AlertTriangle className="text-yellow-600" size={20} />
-              <span>
-                Stock bajo: Quedan <b>{stockRestante}</b>
+              <AlertTriangle className="text-white" size={20} />
+              <span className="font-bold">
+                Stock bajo: Quedan {stockRestante}
               </span>
             </div>
           ),
           {
             style: {
-              border: "1px solid #EAB308",
+              background: "#EF4444", // Red-500
+              color: "#FFFFFF",
               padding: "12px",
-              color: "#713200",
+              borderRadius: "12px",
+              fontWeight: "600",
+              boxShadow: "0 4px 12px rgba(239, 68, 68, 0.3)",
+              border: "1px solid #B91C1C",
             },
+            duration: 4000,
           }
         );
         playLowStockSound();
@@ -446,8 +450,12 @@ export default function PosScreen() {
           // Si intenta bajar de 1, no hacer nada (o eliminar)
           if (nuevaCantidad < 1) return item;
 
-          // Validación de Stock al incrementar
-          if (delta > 0 && nuevaCantidad > item.stock_quantity) {
+          // Validación de Stock al incrementar (Solo si NO es promo)
+          if (
+            !item.is_promo &&
+            delta > 0 &&
+            nuevaCantidad > item.stock_quantity
+          ) {
             toast.error(`Stock insuficiente (Max: ${item.stock_quantity})`);
             return item;
           }

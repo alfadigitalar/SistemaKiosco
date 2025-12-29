@@ -54,7 +54,7 @@ function registerIpcHandlers() {
     }
   });
 
-  // Crear nuevo producto
+  // Crear nuevo producto (o Promo)
   ipcMain.handle("add-product", async (event, product) => {
     try {
       const {
@@ -67,11 +67,13 @@ function registerIpcHandlers() {
         category_id,
         supplier_id,
         measurement_unit,
+        is_promo, // Nuevo
+        promo_items, // Nuevo: Array de { product_id, quantity }
       } = product;
 
-      await run(
-        `INSERT INTO products (barcode, name, cost_price, sale_price, stock_quantity, min_stock, category_id, supplier_id, measurement_unit)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      const result = await run(
+        `INSERT INTO products (barcode, name, cost_price, sale_price, stock_quantity, min_stock, category_id, supplier_id, measurement_unit, is_promo)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           barcode,
           name,
@@ -82,8 +84,21 @@ function registerIpcHandlers() {
           category_id,
           supplier_id,
           measurement_unit || "un",
+          is_promo ? 1 : 0,
         ]
       );
+
+      const newProductId = result.lastId;
+
+      // Si es promo, insertar sus items
+      if (is_promo && promo_items && Array.isArray(promo_items)) {
+        for (const item of promo_items) {
+          await run(
+            "INSERT INTO promo_items (promo_id, product_id, quantity) VALUES (?, ?, ?)",
+            [newProductId, item.product_id, item.quantity]
+          );
+        }
+      }
 
       return { success: true };
     } catch (error) {
@@ -109,12 +124,15 @@ function registerIpcHandlers() {
         min_stock,
         category_id,
         supplier_id,
+
         measurement_unit,
+        is_promo, // Nuevo
+        promo_items, // Nuevo
       } = product;
 
       await run(
         `UPDATE products 
-         SET barcode=?, name=?, cost_price=?, sale_price=?, stock_quantity=?, min_stock=?, category_id=?, supplier_id=?, measurement_unit=?
+         SET barcode=?, name=?, cost_price=?, sale_price=?, stock_quantity=?, min_stock=?, category_id=?, supplier_id=?, measurement_unit=?, is_promo=?
          WHERE id=?`,
         [
           barcode,
@@ -126,9 +144,26 @@ function registerIpcHandlers() {
           category_id,
           supplier_id,
           measurement_unit || "un",
+          is_promo ? 1 : 0, // is_promo no estaba en el update, agregarlo
           id,
         ]
       );
+
+      // Si es promo, actualizar items (Borrar y Reinsertar es lo más fácil)
+      if (is_promo) {
+        // 1. Borrar items viejos
+        await run("DELETE FROM promo_items WHERE promo_id = ?", [id]);
+
+        // 2. Insertar nuevos
+        if (promo_items && Array.isArray(promo_items)) {
+          for (const item of promo_items) {
+            await run(
+              "INSERT INTO promo_items (promo_id, product_id, quantity) VALUES (?, ?, ?)",
+              [id, item.product_id, item.quantity]
+            );
+          }
+        }
+      }
 
       return { success: true };
     } catch (error) {
@@ -148,6 +183,26 @@ function registerIpcHandlers() {
     } catch (error) {
       console.error("Error al eliminar producto:", error);
       return { success: false, error: error.message };
+    }
+  });
+
+  // Obtener items de una promo
+  ipcMain.handle("get-promo-items", async (event, promoId) => {
+    try {
+      // Join con products para obtener nombres de componentes
+      const items = await all(
+        `
+              SELECT pi.*, p.name, p.barcode 
+              FROM promo_items pi
+              JOIN products p ON pi.product_id = p.id
+              WHERE pi.promo_id = ?
+          `,
+        [promoId]
+      );
+      return items;
+    } catch (error) {
+      console.error("Error al obtener items de promo:", error);
+      return [];
     }
   });
 
@@ -221,11 +276,34 @@ function registerIpcHandlers() {
           ]
         );
 
-        // Descontar stock del producto
-        await run(
-          `UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?`,
-          [item.cantidad, item.id]
+        // Descontar stock del producto (Manejo de Promos)
+        // Verificar si es promo
+        const productInfo = await get(
+          "SELECT is_promo FROM products WHERE id = ?",
+          [item.id]
         );
+
+        if (productInfo && productInfo.is_promo === 1) {
+          // Es promo: Descontar stock de sus componentes
+          const components = await all(
+            "SELECT product_id, quantity FROM promo_items WHERE promo_id = ?",
+            [item.id]
+          );
+          for (const comp of components) {
+            // Cantidad a descontar = (qtyComponente * qtyVenta)
+            await run(
+              "UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?",
+              [comp.quantity * item.cantidad, comp.product_id]
+            );
+            // Opcional: Registrar movimiento de stock para cada componente (si tuviéramos tabla detallada)
+          }
+        } else {
+          // Es producto normal
+          await run(
+            `UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?`,
+            [item.cantidad, item.id]
+          );
+        }
       }
 
       // 3. Si es Cuenta Corriente, actualizar deuda del cliente

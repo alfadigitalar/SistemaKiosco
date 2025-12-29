@@ -148,6 +148,22 @@ async function initDatabase() {
       db.run("ALTER TABLE cash_sessions ADD COLUMN difference REAL");
     } catch (e) {}
 
+    // MIGRATION: Promos/Combos (Fase 33)
+    try {
+      db.run("ALTER TABLE products ADD COLUMN is_promo INTEGER DEFAULT 0");
+    } catch (e) {}
+
+    try {
+      db.run(`CREATE TABLE IF NOT EXISTS promo_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        promo_id INTEGER NOT NULL,
+        product_id INTEGER NOT NULL,
+        quantity REAL NOT NULL,
+        FOREIGN KEY(promo_id) REFERENCES products(id),
+        FOREIGN KEY(product_id) REFERENCES products(id)
+      )`);
+    } catch (e) {}
+
     saveDatabase(); // Guardar cambios de estructura
 
     // DEBUG: Ver columnas de users
