@@ -1,8 +1,8 @@
-# Manual Técnico - Novy POS
+# Manual Técnico - Kubo POS
 
 ## 1. Descripción General
 
-Novy POS es un sistema de punto de venta (POS) de escritorio desarrollado con tecnologías web modernas encapsuladas en una aplicación nativa.
+Kubo POS es un sistema de punto de venta (POS) de escritorio desarrollado con tecnologías web modernas encapsuladas en una aplicación nativa.
 Está diseñado para operar en entornos Windows (compatible con Linux/Mac) sin dependencia de servidores externos para su funcionamiento básico (arquitectura Local-First).
 
 ### Tecnologías Principales
@@ -57,7 +57,7 @@ El sistema sigue el modelo de arquitectura de Electron con dos procesos principa
 
 ## 4. Base de Datos (Schema)
 
-El sistema utiliza SQLite. El archivo de base de datos se ubica en `%APPDATA%/novy/novy.sqlite` (en producción).
+El sistema utiliza SQLite. El archivo de base de datos se ubica en `%APPDATA%/kubo/kubo.sqlite` (en producción).
 
 ### Tablas Principales
 
@@ -90,4 +90,4 @@ El instalador se generará en la carpeta `dist`.
 
 - **Error de Impresión:** Verificar que la impresora predeterminada del sistema sea la térmica de 58mm/80mm.
 - **Base de Datos Corrupta:** Utilizar la función "Restaurar Copia" en Configuración.
-- **Pantalla Blanca:** Revisar logs en `%APPDATA%/novy/logs` o ejecutar con `--debug`.
+- **Pantalla Blanca:** Revisar logs en `%APPDATA%/kubo/logs` o ejecutar con `--debug`.

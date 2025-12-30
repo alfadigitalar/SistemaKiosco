@@ -1,4 +1,4 @@
-# Manual de Usuario - Novy POS
+# Manual de Usuario - Kubo POS
 
 ## 1. Inicio de Sesión
 

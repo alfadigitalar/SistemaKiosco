@@ -1,7 +1,7 @@
 {
-  "name": "novy-pos",
+  "name": "kubo-pos",
   "version": "1.0.0",
-  "description": "Novy - Modern Desktop POS System",
+  "description": "Kubo POS - Modern Desktop POS System",
   "main": "src/main/index.js",
   "scripts": {
     "start": "electron .",
@@ -16,7 +16,7 @@
     "pos",
     "sqlite"
   ],
-  "author": "Facundo",
+  "author": "Alfa Digital",
   "license": "MIT",
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.3",

@@ -116,7 +116,7 @@ const generateTicketHTML = (data) => {
     <body>
       <div class="header">
         ${logoUrl ? `<img src="${logoUrl}" class="logo" alt="Logo" />` : ""}
-        <h1>${storeName || "Novy POS"}</h1>
+        <h1>${storeName || "Kubo POS"}</h1>
         <p>${address || ""}</p>
       </div>
       

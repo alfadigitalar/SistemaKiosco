@@ -91,7 +91,7 @@ const CajaScreen = () => {
 
       doc.setFontSize(10);
       doc.setTextColor(100);
-      doc.text(kioskName || "Novy Kiosco", 14, 28);
+      doc.text(kioskName || "Kubo Kiosco", 14, 28);
       doc.text(`Dirección: ${kioskAddress || "-"}`, 14, 33);
       doc.text(
         `Fecha: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,

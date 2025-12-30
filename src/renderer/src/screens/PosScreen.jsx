@@ -794,7 +794,7 @@ export default function PosScreen() {
                     doc.setFont("helvetica", "italic");
                     doc.text("Comprobante Autorizado", 12, y);
                     doc.text(
-                      "Esta factura es un documento no válido como factura fiscal real (Demo Novy POS)",
+                      "Esta factura es un documento no válido como factura fiscal real (Demo Kubo POS)",
                       12,
                       y + 4
                     );

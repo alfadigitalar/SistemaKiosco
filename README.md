@@ -1,4 +1,4 @@
-# Novy POS System
+# Kubo POS System
 
 Architecture: **Electron + Vite + React + SQLite**
 

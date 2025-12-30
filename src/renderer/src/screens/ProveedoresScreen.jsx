@@ -189,7 +189,7 @@ const ProveedoresScreen = () => {
       doc.text("Orden de Compra", 14, 20);
 
       doc.setFontSize(12);
-      doc.text(kioskName || "Novy Kiosco", 14, 30);
+      doc.text(kioskName || "Kubo Kiosco", 14, 30);
       doc.text(`Dirección: ${kioskAddress}`, 14, 35);
       doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 40);
 

@@ -467,6 +467,7 @@ const InventarioScreen = () => {
             </div>
 
             <form
+              id="product-form"
               onSubmit={handleSaveProduct}
               className="p-6 overflow-y-auto space-y-6"
             >
@@ -785,9 +786,10 @@ const InventarioScreen = () => {
               </button>
               <button
                 type="submit"
+                form="product-form"
                 className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium shadow-lg shadow-purple-900/20"
               >
-                Guardar Producto
+                {formData.is_promo ? "Guardar Promo" : "Guardar Producto"}
               </button>
             </div>
           </div>

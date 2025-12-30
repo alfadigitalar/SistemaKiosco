@@ -119,7 +119,7 @@ const LoginScreen = () => {
       <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700 transition-colors">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-            Novy POS
+            Kubo POS
           </h1>
           <p className="text-slate-500 dark:text-slate-400">
             Sign in to access the terminal
