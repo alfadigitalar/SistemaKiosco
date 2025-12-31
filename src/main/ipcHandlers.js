@@ -14,12 +14,30 @@ function registerIpcHandlers() {
   // ═══════════════════════════════════════════════════════════
 
   // Obtener todos los productos activos
+  // Obtener todos los productos activos
   ipcMain.handle("get-products", async () => {
     try {
-      const rows = await all(
-        "SELECT * FROM products WHERE is_active = 1 ORDER BY name ASC"
-      );
-      return rows;
+      // Calculamos el stock dinámico para promos basado en sus componentes
+      const query = `
+        SELECT p.*,
+          (
+            SELECT MIN(CAST(comp.stock_quantity / pi.quantity AS INTEGER))
+            FROM promo_items pi
+            JOIN products comp ON pi.product_id = comp.id
+            WHERE pi.promo_id = p.id
+          ) as calculated_promo_stock
+        FROM products p
+        WHERE p.is_active = 1 
+        ORDER BY p.name ASC
+      `;
+      
+      const rows = await all(query);
+      
+      // Sobrescribimos stock_quantity si es promo
+      return rows.map(p => ({
+        ...p,
+        stock_quantity: p.is_promo ? (p.calculated_promo_stock !== null ? p.calculated_promo_stock : 0) : p.stock_quantity
+      }));
     } catch (error) {
       console.error("Error al obtener productos:", error);
       return [];
@@ -27,12 +45,28 @@ function registerIpcHandlers() {
   });
 
   // Obtener producto por código de barras
+  // Obtener producto por código de barras
   ipcMain.handle("get-product-by-barcode", async (event, barcode) => {
     try {
-      const row = await get(
-        "SELECT * FROM products WHERE barcode = ? AND is_active = 1",
-        [barcode]
-      );
+      const query = `
+        SELECT p.*,
+          (
+            SELECT MIN(CAST(comp.stock_quantity / pi.quantity AS INTEGER))
+            FROM promo_items pi
+            JOIN products comp ON pi.product_id = comp.id
+            WHERE pi.promo_id = p.id
+          ) as calculated_promo_stock
+        FROM products p
+        WHERE p.barcode = ? AND p.is_active = 1
+      `;
+      
+      const row = await get(query, [barcode]);
+      
+      if (row) {
+        row.stock_quantity = row.is_promo 
+          ? (row.calculated_promo_stock !== null ? row.calculated_promo_stock : 0)
+          : row.stock_quantity;
+      }
       return row;
     } catch (error) {
       console.error("Error al buscar producto por código:", error);
@@ -41,13 +75,28 @@ function registerIpcHandlers() {
   });
 
   // Buscar productos por nombre (LIKE)
+  // Buscar productos por nombre (LIKE)
   ipcMain.handle("search-products", async (event, query) => {
     try {
-      const rows = await all(
-        "SELECT * FROM products WHERE name LIKE ? AND is_active = 1 LIMIT 20",
-        [`%${query}%`]
-      );
-      return rows;
+      const sql = `
+        SELECT p.*,
+          (
+            SELECT MIN(CAST(comp.stock_quantity / pi.quantity AS INTEGER))
+            FROM promo_items pi
+            JOIN products comp ON pi.product_id = comp.id
+            WHERE pi.promo_id = p.id
+          ) as calculated_promo_stock
+        FROM products p
+        WHERE p.name LIKE ? AND p.is_active = 1 
+        LIMIT 20
+      `;
+      
+      const rows = await all(sql, [`%${query}%`]);
+      
+      return rows.map(p => ({
+        ...p,
+        stock_quantity: p.is_promo ? (p.calculated_promo_stock !== null ? p.calculated_promo_stock : 0) : p.stock_quantity
+      }));
     } catch (error) {
       console.error("Error al buscar productos:", error);
       return [];
@@ -599,7 +648,7 @@ function registerIpcHandlers() {
 
       // 3. Productos con Stock Bajo
       const lowStock = await get(
-        "SELECT COUNT(*) as count FROM products WHERE stock_quantity <= min_stock AND is_active = 1"
+        "SELECT COUNT(*) as count FROM products WHERE stock_quantity <= min_stock AND is_active = 1 AND (is_promo = 0 OR is_promo IS NULL)"
       );
 
       // 4. Últimas 5 ventas

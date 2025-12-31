@@ -141,12 +141,17 @@ const InventarioScreen = () => {
         window.api.getPromoItems(product.id).then((items) => {
           // Convert to format useful for selection
           setSelectedComponents(
-            items.map((i) => ({
-              id: i.product_id,
-              name: i.name,
-              barcode: i.barcode,
-              qty: i.quantity,
-            }))
+            items.map((i) => {
+              // Buscar el producto en la lista actual para tener el stock actualizado
+              const currentProd = products.find(p => p.id === i.product_id);
+              return {
+                id: i.product_id,
+                name: i.name,
+                barcode: i.barcode,
+                qty: i.quantity,
+                stock_quantity: currentProd ? currentProd.stock_quantity : 0 // Necesario para cálculo
+              };
+            })
           );
         });
       } else {
@@ -273,6 +278,33 @@ const InventarioScreen = () => {
       )
     );
   };
+
+  // Efecto para calcular stock automático en Promos
+  useEffect(() => {
+    if (formData.is_promo) {
+      if (selectedComponents.length === 0) {
+        setFormData((prev) => ({ ...prev, stock_quantity: 0 }));
+        return;
+      }
+
+      let maxPossible = Infinity;
+      selectedComponents.forEach((comp) => {
+        const stock = comp.stock_quantity || 0;
+        const required = comp.qty || 1;
+        if (required > 0) {
+          const possible = Math.floor(stock / required);
+          if (possible < maxPossible) maxPossible = possible;
+        }
+      });
+
+      const calculated = maxPossible === Infinity ? 0 : maxPossible;
+      // Solo actualizamos si cambió para evitar renders infinitos
+      setFormData((prev) => {
+        if (prev.stock_quantity === calculated) return prev;
+        return { ...prev, stock_quantity: calculated };
+      });
+    }
+  }, [selectedComponents, formData.is_promo]);
 
   return (
     <div className="h-full flex flex-col p-6 space-y-6 overflow-hidden bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white transition-colors duration-300">
@@ -479,7 +511,6 @@ const InventarioScreen = () => {
                     onClick={() =>
                       setFormData({
                         ...formData,
-                        is_promo: false,
                         is_promo: false,
                       })
                     }
@@ -758,20 +789,29 @@ const InventarioScreen = () => {
                 </div>
                 <div>
                   <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">
-                    Stock {formData.is_promo ? "(Manual/Objetivo)" : "Actual"}
+                    Stock {formData.is_promo ? "(Calculado)" : "Actual"}
                   </label>
                   <input
                     type="number"
-                    className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none transition-colors"
+                    className={`w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none transition-colors ${
+                      formData.is_promo ? "opacity-70 bg-slate-100 dark:bg-slate-700 cursor-not-allowed" : ""
+                    }`}
                     value={formData.stock_quantity}
                     onChange={(e) =>
+                      !formData.is_promo &&
                       setFormData({
                         ...formData,
                         stock_quantity: e.target.value,
                       })
                     }
+                    readOnly={formData.is_promo}
                     placeholder="0"
                   />
+                  {formData.is_promo && (
+                    <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+                      Determinado por los componentes
+                    </p>
+                  )}
                 </div>
               </div>
             </form>
