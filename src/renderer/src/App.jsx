@@ -26,7 +26,7 @@ import ReportesScreen from "./screens/ReportesScreen";
 function App() {
   return (
     <Router>
-      <div className="h-screen w-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-white overflow-hidden font-sans transition-colors duration-300">
+      <div className="min-h-screen w-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-white overflow-x-hidden font-sans transition-colors duration-300">
         <ConfigProvider>
           <ErrorBoundary>
             <Toaster

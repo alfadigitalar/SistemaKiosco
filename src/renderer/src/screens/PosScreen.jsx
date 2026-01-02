@@ -803,7 +803,7 @@ export default function PosScreen() {
                 type="email"
                 autoFocus
                 className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="facucasla2015@gmail.com"
+                placeholder="cliente@ejemplo.com"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();

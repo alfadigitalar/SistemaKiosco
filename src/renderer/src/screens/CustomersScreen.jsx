@@ -231,7 +231,7 @@ const CustomersScreen = () => {
                         : "text-green-500 dark:text-green-400"
                     }`}
                   >
-                    ${customer.current_debt.toLocaleString()}
+                    ${(customer.current_debt || 0).toLocaleString()}
                   </td>
                   <td className="p-4 flex justify-center gap-2">
                     <button
