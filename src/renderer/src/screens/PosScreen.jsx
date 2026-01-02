@@ -17,6 +17,7 @@ import PaymentModal from "../components/PaymentModal";
 import CustomerSearch from "../components/CustomerSearch";
 import WeightModal from "../components/WeightModal";
 import jsPDF from "jspdf";
+import DemoModal from "../components/DemoModal";
 
 /**
  * Pantalla Principal de Punto de Venta (POS)
@@ -56,6 +57,9 @@ export default function PosScreen() {
 
   // Ticket config
   const [shouldPrintTicket, setShouldPrintTicket] = useState(true);
+
+  // Demo Modal
+  const [demoModalOpen, setDemoModalOpen] = useState(false);
 
   const inputRef = useRef(null);
   const navigate = useNavigate();
@@ -636,6 +640,13 @@ export default function PosScreen() {
 
   // Procesar el pago confirmado
   const procesarPago = async (pagoData) => {
+    // Intercepción Demo Portfolio
+    if (window.api.isDemo) {
+      setModalPagoAbierto(false);
+      setDemoModalOpen(true);
+      return { success: false, message: "Demo Mode" };
+    }
+
     try {
       // Preparar datos para el backend
       const saleData = {
@@ -743,6 +754,11 @@ export default function PosScreen() {
         total={total}
         onConfirm={procesarPago}
         clientName={clienteSeleccionado ? clienteSeleccionado.name : null}
+      />
+      <DemoModal
+        isOpen={demoModalOpen}
+        onClose={() => setDemoModalOpen(false)}
+        actionName="procesar ventas reales"
       />
       <WeightModal
         isOpen={weightModalOpen}
