@@ -7,42 +7,62 @@ const mockProducts = [
   {
     id: 1,
     name: "Coca Cola 500ml",
-    price: 1500,
-    stock: 50,
+    cost_price: 1000,
+    sale_price: 1500,
+    stock_quantity: 50,
+    min_stock: 10,
     barcode: "7790895000997",
     category: "Bebidas",
+    measurement_unit: "un",
+    is_promo: false,
   },
   {
     id: 2,
     name: "Papas Lays Clásicas",
-    price: 1200,
-    stock: 20,
+    cost_price: 800,
+    sale_price: 1200,
+    stock_quantity: 20,
+    min_stock: 5,
     barcode: "7791234567890",
     category: "Snacks",
+    measurement_unit: "un",
+    is_promo: false,
   },
   {
     id: 3,
     name: "Alfajor Jorgito",
-    price: 800,
-    stock: 100,
+    cost_price: 400,
+    sale_price: 800,
+    stock_quantity: 100,
+    min_stock: 20,
     barcode: "7793344556677",
     category: "Golocinas",
+    measurement_unit: "un",
+    is_promo: false,
   },
   {
     id: 4,
     name: "Agua Mineral 1L",
-    price: 1000,
-    stock: 30,
+    cost_price: 600,
+    sale_price: 1000,
+    stock_quantity: 30,
+    min_stock: 5,
     barcode: "7799887766554",
     category: "Bebidas",
+    measurement_unit: "un",
+    is_promo: false,
   },
   {
     id: 5,
     name: "Chicles Beldent",
-    price: 500,
-    stock: 200,
+    cost_price: 300,
+    sale_price: 500,
+    stock_quantity: 200,
+    min_stock: 50,
     barcode: "7791122334455",
     category: "Golocinas",
+    measurement_unit: "un",
+    is_promo: false,
   },
 ];
 
@@ -85,9 +105,6 @@ export const mockApi = {
   // ═══════════════════════════════════════════════════════════
   // PRODUCTOS
   // ═══════════════════════════════════════════════════════════
-  // ═══════════════════════════════════════════════════════════
-  // PRODUCTOS
-  // ═══════════════════════════════════════════════════════════
   getProducts: async () => {
     console.log("[Demo] Getting products...");
     return [
@@ -95,10 +112,14 @@ export const mockApi = {
       {
         id: 999,
         name: "PRODUCTO PRUEBA",
-        price: 100,
-        stock: 999,
+        cost_price: 50,
+        sale_price: 100,
+        stock_quantity: 999,
+        min_stock: 10,
         barcode: "123456",
         category: "Demo",
+        measurement_unit: "un",
+        is_promo: false,
       }, // Producto solicitado
     ];
   },
@@ -109,10 +130,14 @@ export const mockApi = {
       return {
         id: 999,
         name: "PRODUCTO PRUEBA",
-        price: 100,
-        stock: 999,
+        cost_price: 50,
+        sale_price: 100,
+        stock_quantity: 999,
+        min_stock: 10,
         barcode: "123456",
         category: "Demo",
+        measurement_unit: "un",
+        is_promo: false,
       };
     return mockProducts.find((p) => p.barcode === barcode) || null;
   },
@@ -127,10 +152,14 @@ export const mockApi = {
       results.push({
         id: 999,
         name: "PRODUCTO PRUEBA",
-        price: 100,
-        stock: 999,
+        cost_price: 50,
+        sale_price: 100,
+        stock_quantity: 999,
+        min_stock: 10,
         barcode: "123456",
         category: "Demo",
+        measurement_unit: "un",
+        is_promo: false,
       });
     }
     return results;
@@ -243,15 +272,17 @@ export const mockApi = {
   // ESTADISTICAS
   // ═══════════════════════════════════════════════════════════
   getDashboardStats: async () => ({
-    dailySales: 125000,
-    monthlySales: 3500000,
+    totalDay: 125000,
+    totalMonth: 3500000,
     totalOrders: 45,
     lowStockCount: 2,
+    salesChartData: [], // Prevent map error
+    topProducts: [], // Prevent map error
   }),
   getProfitStats: async () => ({
     revenue: 10000,
     cost: 5000,
-    profit: 5000,
+    totalProfit: 5000,
     margin: 50,
   }),
   getSalesHistory: async () => [],

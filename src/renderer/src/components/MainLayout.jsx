@@ -27,6 +27,23 @@ const MainLayout = () => {
   const { theme, toggleTheme, themeColor, getThemeClasses } = useConfig();
   const themeClasses = getThemeClasses(themeColor);
 
+  const [kioskName, setKioskName] = useState("Cargando...");
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await window.api.getSettings();
+        if (settings && settings.kiosk_name) {
+          setKioskName(settings.kiosk_name);
+        }
+      } catch (error) {
+        console.error("Error loading settings:", error);
+        setKioskName("POS System");
+      }
+    };
+    loadSettings();
+  }, []);
+
   // Handle responsive sidebar
   useEffect(() => {
     const handleResize = () => {
@@ -111,7 +128,7 @@ const MainLayout = () => {
               <span
                 className={`text-slate-900 dark:text-white border-b-2 ${themeClasses.border} pb-0.5 truncate`}
               >
-                Alma Ponce
+                {kioskName}
               </span>
             </div>
           ) : (
