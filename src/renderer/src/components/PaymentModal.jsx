@@ -107,6 +107,7 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm }) => {
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-2 sm:p-4 transition-opacity duration-300">
+      {/* Modal responsivo con scroll para móviles */}
       <div className="bg-slate-800 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[95vh] border border-slate-700 transform transition-all scale-100">
         <div className="p-4 sm:p-6 flex-shrink-0 border-b border-slate-700">
           <div className="flex justify-between items-center mb-2 sm:mb-4">
