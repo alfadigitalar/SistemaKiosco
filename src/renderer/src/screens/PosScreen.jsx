@@ -640,13 +640,6 @@ export default function PosScreen() {
 
   // Procesar el pago confirmado
   const procesarPago = async (pagoData) => {
-    // Intercepción Demo Portfolio
-    if (window.api.isDemo) {
-      setModalPagoAbierto(false);
-      setDemoModalOpen(true);
-      return { success: false, message: "Demo Mode" };
-    }
-
     try {
       // Preparar datos para el backend
       const saleData = {
@@ -735,6 +728,13 @@ export default function PosScreen() {
       }
     } catch (error) {
       console.error("Error al procesar pago:", error);
+
+      if (error.message === "DEMO_RESTRICTED") {
+        setModalPagoAbierto(false);
+        setDemoModalOpen(true);
+        return { success: false, message: "Demo Mode" };
+      }
+
       return {
         success: false,
         message: error.message || "Error desconocido en createSale",

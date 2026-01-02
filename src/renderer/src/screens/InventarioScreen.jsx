@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import StockDetailModal from "../components/StockDetailModal";
+import DemoModal from "../components/DemoModal";
 
 const InventarioScreen = () => {
   const [products, setProducts] = useState([]);
@@ -27,6 +28,9 @@ const InventarioScreen = () => {
   // Stock Control Modal
   const [stockModalOpen, setStockModalOpen] = useState(false);
   const [selectedProductForStock, setSelectedProductForStock] = useState(null);
+
+  // Demo Modal
+  const [demoModalOpen, setDemoModalOpen] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -228,6 +232,10 @@ const InventarioScreen = () => {
       setIsModalOpen(false);
       fetchProducts();
     } catch (error) {
+      if (error.message === "DEMO_RESTRICTED") {
+        setDemoModalOpen(true);
+        return;
+      }
       toast.error("Error al guardar producto");
     }
   };
@@ -239,6 +247,10 @@ const InventarioScreen = () => {
         toast.success("Producto eliminado");
         fetchProducts();
       } catch (error) {
+        if (error.message === "DEMO_RESTRICTED") {
+          setDemoModalOpen(true);
+          return;
+        }
         toast.error("Error al eliminar");
       }
     }
@@ -816,27 +828,28 @@ const InventarioScreen = () => {
                   )}
                 </div>
               </div>
+              {/* Botón Guardar */}
+              <div className="p-6 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-900/50 rounded-b-2xl">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  form="product-form"
+                  className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-lg shadow-purple-500/30 transition-all active:scale-95"
+                >
+                  {formData.is_promo ? "Guardar Promo" : "Guardar Producto"}
+                </button>
+              </div>
             </form>
-
-            <div className="p-6 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3 transition-colors">
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                form="product-form"
-                className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium shadow-lg shadow-purple-900/20"
-              >
-                {formData.is_promo ? "Guardar Promo" : "Guardar Producto"}
-              </button>
-            </div>
           </div>
         </div>
       )}
+
       {/* Modal Control de Stock */}
       <StockDetailModal
         isOpen={stockModalOpen}
@@ -845,6 +858,12 @@ const InventarioScreen = () => {
         onStockUpdate={() => {
           fetchProducts(); // Recargar tabla principal para ver stock actualizado
         }}
+      />
+
+      <DemoModal
+        isOpen={demoModalOpen}
+        onClose={() => setDemoModalOpen(false)}
+        actionName="modificar el inventario"
       />
     </div>
   );
