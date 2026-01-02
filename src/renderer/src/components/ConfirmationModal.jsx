@@ -1,70 +1,68 @@
-import React from "react";
-import { AlertTriangle, X } from "lucide-react";
-import { useConfig } from "../context/ConfigContext";
+import React, { useEffect } from "react";
+import { AlertTriangle, Check, X } from "lucide-react";
 
 const ConfirmationModal = ({
   isOpen,
   onClose,
   onConfirm,
-  title,
-  message,
+  title = "Confirmar acción",
+  message = "¿Estás seguro de continuar?",
   confirmText = "Confirmar",
   cancelText = "Cancelar",
   isDestructive = false,
 }) => {
-  const { getThemeClasses } = useConfig();
-  const theme = getThemeClasses();
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!isOpen) return;
+      if (e.key === "Enter") {
+        e.preventDefault();
+        onConfirm();
+      }
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onConfirm, onClose]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700 transform transition-all scale-100 animate-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b border-slate-100 dark:border-slate-700">
-          <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-            {isDestructive && (
-              <AlertTriangle className="text-red-500" size={20} />
-            )}
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6 border border-slate-200 dark:border-slate-700 scale-100 opacity-100">
+        <div className="flex flex-col items-center text-center mb-6">
+          <div
+            className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${
+              isDestructive
+                ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+                : "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+            }`}
+          >
+            <AlertTriangle size={24} />
+          </div>
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
             {title}
           </h3>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors"
-          >
-            <X size={20} />
-          </button>
+          <p className="text-slate-500 dark:text-slate-400">{message}</p>
         </div>
 
-        {/* Body */}
-        <div className="p-6">
-          <p className="text-slate-600 dark:text-slate-300 text-base leading-relaxed">
-            {message}
-          </p>
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-b-2xl flex justify-end gap-3 border-t border-slate-100 dark:border-slate-700">
+        <div className="grid grid-cols-2 gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-lg font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50 transition-colors"
+            className="py-3 px-4 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition"
           >
             {cancelText}
           </button>
           <button
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
-            className={`
-              px-4 py-2 rounded-lg font-bold text-white shadow-md transition-all active:scale-95
-              ${
-                isDestructive
-                  ? "bg-red-500 hover:bg-red-600"
-                  : `${theme.bg} ${theme.hover}`
-              }
-            `}
+            onClick={onConfirm}
+            className={`py-3 px-4 rounded-xl text-white font-bold transition flex items-center justify-center gap-2 ${
+              isDestructive
+                ? "bg-red-600 hover:bg-red-500 shadow-lg shadow-red-900/20"
+                : "bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/20"
+            }`}
           >
+            <Check size={18} />
             {confirmText}
           </button>
         </div>

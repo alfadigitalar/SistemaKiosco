@@ -1,16 +1,21 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import { User, Lock, ArrowRight } from "lucide-react";
 import confetti from "canvas-confetti";
 
+import logoKubo from "../assets/kubo_transparent.png";
+import logoKuboDark from "../assets/kubo_white_text.png";
+
 const LoginScreen = () => {
   const [username, setUsername] = useState("");
+  // ... (rest of state items are fine)
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
+    // ... (rest of handleLogin)
     e.preventDefault();
     setLoading(true);
 
@@ -47,9 +52,10 @@ const LoginScreen = () => {
             today.getDate() === bday.getDate() &&
             today.getMonth() === bday.getMonth()
           ) {
-            toast(`¡Feliz Cumpleaños ${result.user.name}! 🎂`, {
+            toast(`¡Feliz Cumpleaños ${result.user.name}!`, {
+              // Removed emoji
               duration: 5000,
-              icon: "🥳",
+              // icon: "🥳", // Removed emoji
               style: {
                 borderRadius: "10px",
                 background: "#FFD700",
@@ -114,15 +120,22 @@ const LoginScreen = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-900 flex items-center justify-center p-4 transition-colors duration-300">
-      <Toaster position="top-right" />
+      {/* Toaster removed to avoid duplication with App.jsx */}
 
       <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700 transition-colors">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-            Kubo POS
-          </h1>
+        <div className="text-center mb-8 flex flex-col items-center">
+          <img
+            src={logoKubo}
+            alt="Kubo POS"
+            className="h-40 mb-6 object-contain block dark:hidden"
+          />
+          <img
+            src={logoKuboDark}
+            alt="Kubo POS"
+            className="h-40 mb-6 object-contain hidden dark:block"
+          />
           <p className="text-slate-500 dark:text-slate-400">
-            Sign in to access the terminal
+            Inicia sesión para acceder al sistema
           </p>
         </div>
 
@@ -130,7 +143,7 @@ const LoginScreen = () => {
           {/* Username Input */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-600 dark:text-slate-300 ml-1">
-              Username
+              Usuario
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -150,7 +163,7 @@ const LoginScreen = () => {
           {/* Password Input */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-600 dark:text-slate-300 ml-1">
-              Password
+              Contraseña
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -174,17 +187,17 @@ const LoginScreen = () => {
             className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition duration-200 flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
-              <span className="animate-pulse">Verifying...</span>
+              <span className="animate-pulse">Verificando...</span>
             ) : (
               <>
-                Access System <ArrowRight className="h-5 w-5" />
+                Ingresar al Sistema <ArrowRight className="h-5 w-5" />
               </>
             )}
           </button>
         </form>
 
         <div className="mt-6 text-center text-xs text-slate-500">
-          <p>Protected System • Authorized Personnel Only</p>
+          <p>Sistema Protegido • Solo Personal Autorizado</p>
         </div>
       </div>
     </div>

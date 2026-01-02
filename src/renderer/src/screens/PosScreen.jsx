@@ -12,7 +12,7 @@ import {
   Mail,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import PaymentModal from "../components/PaymentModal";
 import CustomerSearch from "../components/CustomerSearch";
 import WeightModal from "../components/WeightModal";
@@ -80,7 +80,7 @@ export default function PosScreen() {
         const session = await window.api.getCurrentSession();
         if (!session) {
           setIsSessionClosed(true);
-          toast.error("⚠️ LA CAJA ESTÁ CERRADA. No puede realizar ventas.");
+          // toast.error("LA CAJA ESTÁ CERRADA. No puede realizar ventas."); // Removed to avoid double alert (Modal + Toast)
         }
       } catch (error) {
         console.error(error);
@@ -241,7 +241,7 @@ export default function PosScreen() {
           {
             id: `promo-alert-${promo.id}`, // ID único por promo
             duration: 8000,
-            icon: "✨",
+            // icon: "✨", // Removed emoji
             style: {
               background: "#7E22CE", // purple-700
               color: "#fff",
