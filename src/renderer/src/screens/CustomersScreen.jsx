@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Plus, Search, Trash2, Edit, DollarSign, User } from "lucide-react";
 import { toast } from "react-hot-toast";
 import ConfirmationModal from "../components/ConfirmationModal";
+import DemoModal from "../components/DemoModal";
 
 const CustomersScreen = () => {
   const [customers, setCustomers] = useState([]);
@@ -29,6 +30,9 @@ const CustomersScreen = () => {
 
   // Debt Payment State
   const [paymentAmount, setPaymentAmount] = useState("");
+
+  // Demo Modal
+  const [demoModalOpen, setDemoModalOpen] = useState(false);
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -80,6 +84,10 @@ const CustomersScreen = () => {
       setIsModalOpen(false);
       fetchCustomers();
     } catch (error) {
+      if (error.message === "DEMO_RESTRICTED") {
+        setDemoModalOpen(true);
+        return;
+      }
       toast.error("Error al guardar cliente");
     }
   };
@@ -95,6 +103,10 @@ const CustomersScreen = () => {
         toast.success("Cliente eliminado");
         fetchCustomers();
       } catch (error) {
+        if (error.message === "DEMO_RESTRICTED") {
+          setDemoModalOpen(true);
+          return;
+        }
         toast.error("Error al eliminar");
       }
     });
@@ -128,6 +140,10 @@ const CustomersScreen = () => {
       setIsDebtModalOpen(false);
       fetchCustomers();
     } catch (error) {
+      if (error.message === "DEMO_RESTRICTED") {
+        setDemoModalOpen(true);
+        return;
+      }
       toast.error("Error al procesar pago");
     }
   };
@@ -408,6 +424,13 @@ const CustomersScreen = () => {
         message={confirmMessage}
         isDestructive={true}
         confirmText="Eliminar"
+      />
+
+      {/* Demo Modal */}
+      <DemoModal
+        isOpen={demoModalOpen}
+        onClose={() => setDemoModalOpen(false)}
+        actionName="esta gestión"
       />
     </div>
   );
