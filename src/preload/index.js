@@ -80,6 +80,9 @@ contextBridge.exposeInMainWorld("api", {
   getSalesHistory: (filters) =>
     ipcRenderer.invoke("get-sales-history", filters),
   getSaleDetails: (saleId) => ipcRenderer.invoke("get-sale-details", saleId),
+  getAdvancedReport: (filters) =>
+    ipcRenderer.invoke("get-advanced-report", filters),
+  getAllActivePromos: () => ipcRenderer.invoke("get-all-active-promos"),
 
   // ═══════════════════════════════════════════════════════════
   // MÉTODOS DE PROVEEDORES
@@ -116,6 +119,10 @@ contextBridge.exposeInMainWorld("api", {
 
   // Email
   sendEmailTicket: (data) => ipcRenderer.invoke("send-email-ticket", data),
+
+  // ARCA (AFIP)
+  createElectronicInvoice: (data) =>
+    ipcRenderer.invoke("create-electronic-invoice", data),
 
   // ═══════════════════════════════════════════════════════════
   // ESCÁNER MÓVIL

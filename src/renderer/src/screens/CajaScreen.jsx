@@ -253,6 +253,13 @@ const CajaScreen = () => {
       return toast.error("Monto inválido");
     if (!movementDesc) return toast.error("Ingrese una descripción");
 
+    // Frontend Validation: Saldo Insuficiente
+    if (movementType === "withdrawal" && summary) {
+      if (parseFloat(movementAmount) > summary.finalBalance) {
+        return toast.error("No se puede retirar más del saldo disponible");
+      }
+    }
+
     try {
       const result = await window.api.addCashMovement({
         type: movementType,

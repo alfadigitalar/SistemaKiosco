@@ -276,7 +276,8 @@
                     );
 
                     startBtn.style.display = 'none';
-                    logError("Cámara iniciada correctamente.");
+                    // logError("Cámara iniciada correctamente.");
+                    debugLogEl.style.display = 'none'; // Hide logs on success
 
                     // Optimistic Flash Button
                     flashBtn.style.display = 'flex';
@@ -303,7 +304,7 @@
 
                             // Debug capabilities
                             const caps = track.getCapabilities ? track.getCapabilities() : {};
-                            logError("Caps: " + JSON.stringify(caps));
+                            // logError("Caps: " + JSON.stringify(caps));
 
                             isFlashOn = !isFlashOn;
 

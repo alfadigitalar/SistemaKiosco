@@ -166,6 +166,22 @@ async function initDatabase() {
 
     saveDatabase(); // Guardar cambios de estructura
 
+    // MIGRATION: AFIP / ARCA Columns (Fase 40)
+    try {
+      db.run("ALTER TABLE sales ADD COLUMN invoice_type TEXT");
+    } catch (e) {}
+    try {
+      db.run("ALTER TABLE sales ADD COLUMN invoice_number INTEGER");
+    } catch (e) {}
+    try {
+      db.run("ALTER TABLE sales ADD COLUMN cae TEXT");
+    } catch (e) {}
+    try {
+      db.run("ALTER TABLE sales ADD COLUMN cae_expiration TEXT");
+    } catch (e) {}
+
+    saveDatabase(); // Guardar de nuevo
+
     // DEBUG: Ver columnas de users
     const cols = db.exec("PRAGMA table_info(users)")[0].values;
     console.log(

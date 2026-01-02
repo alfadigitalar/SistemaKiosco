@@ -41,6 +41,15 @@ const ConfiguracionScreen = () => {
   const [smtpUser, setSmtpUser] = useState("");
   const [smtpPass, setSmtpPass] = useState("");
 
+  // State for Tax (ARCA)
+  const { taxEnabled, taxCuit, taxSalesPoint, taxCertPath, taxKeyPath } =
+    useConfig();
+  const [taxEnabledLocal, setTaxEnabledLocal] = useState(false);
+  const [taxCuitLocal, setTaxCuitLocal] = useState("");
+  const [taxSalesPointLocal, setTaxSalesPointLocal] = useState("");
+  const [taxCertPathLocal, setTaxCertPathLocal] = useState("");
+  const [taxKeyPathLocal, setTaxKeyPathLocal] = useState("");
+
   // Estado para gestión de usuario
   const [currentUser, setCurrentUser] = useState({});
   const [avatarPreview, setAvatarPreview] = useState(null);
@@ -94,7 +103,24 @@ const ConfiguracionScreen = () => {
         if (settings.smtp_pass) setSmtpPass(settings.smtp_pass);
       }
     });
-  }, [kioskName, kioskAddress, themeColor, themeMode]);
+
+    // Sync Tax
+    setTaxEnabledLocal(taxEnabled);
+    setTaxCuitLocal(taxCuit || "");
+    setTaxSalesPointLocal(taxSalesPoint || "");
+    setTaxCertPathLocal(taxCertPath || "");
+    setTaxKeyPathLocal(taxKeyPath || "");
+  }, [
+    kioskName,
+    kioskAddress,
+    themeColor,
+    themeMode,
+    taxEnabled,
+    taxCuit,
+    taxSalesPoint,
+    taxCertPath,
+    taxKeyPath,
+  ]);
 
   const handleLogoChange = (e) => {
     const file = e.target.files[0];
@@ -181,6 +207,17 @@ const ConfiguracionScreen = () => {
     { id: "green", name: "Verde", class: "bg-green-500" },
     { id: "orange", name: "Naranja", class: "bg-orange-500" },
     { id: "pink", name: "Rosa", class: "bg-pink-500" },
+    { id: "red", name: "Rojo", class: "bg-red-500" },
+    { id: "yellow", name: "Amarillo", class: "bg-yellow-500" },
+    { id: "teal", name: "Verde Azulado", class: "bg-teal-500" },
+    { id: "cyan", name: "Cian", class: "bg-cyan-500" },
+    { id: "indigo", name: "Índigo", class: "bg-indigo-500" },
+    // Pasteles
+    { id: "pastelBlue", name: "Cielo Pastel", class: "bg-sky-400" },
+    { id: "pastelPurple", name: "Lavanda", class: "bg-violet-400" },
+    { id: "pastelGreen", name: "Menta", class: "bg-emerald-400" },
+    { id: "pastelPink", name: "Rosa Pastel", class: "bg-rose-400" },
+    { id: "pastelOrange", name: "Durazno", class: "bg-orange-400" },
   ];
 
   return (
@@ -501,6 +538,105 @@ const ConfiguracionScreen = () => {
           </p>
         </div>
 
+        {/* Sección Facturación Electrónica (ARCA / AFIP) */}
+        <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg transition-colors">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800 dark:text-white">
+            <Printer className="text-slate-400" /> Facturación Electrónica
+            (ARCA)
+          </h2>
+
+          <div className="mb-4">
+            <div className="flex items-center gap-3 mb-2">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={taxEnabledLocal}
+                  onChange={(e) => setTaxEnabledLocal(e.target.checked)}
+                />
+                <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                <span className="ml-3 text-sm font-medium text-slate-900 dark:text-slate-300">
+                  {taxEnabledLocal ? "Habilitado" : "Deshabilitado"}
+                </span>
+              </label>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">
+              Habilita la emisión de comprobantes autorizados (CAE) directamente
+              con ARCA/AFIP.
+            </p>
+          </div>
+
+          {taxEnabledLocal && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-4">
+              <div>
+                <label className="block text-sm text-slate-400 mb-2">
+                  CUIT (Sin guiones)
+                </label>
+                <input
+                  type="text"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  value={taxCuitLocal}
+                  onChange={(e) => setTaxCuitLocal(e.target.value)}
+                  placeholder="20123456789"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-400 mb-2">
+                  Punto de Venta
+                </label>
+                <input
+                  type="number"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  value={taxSalesPointLocal}
+                  onChange={(e) => setTaxSalesPointLocal(e.target.value)}
+                  placeholder="Ej: 3"
+                />
+              </div>
+
+              {/* Certificados */}
+              <div className="col-span-1 md:col-span-2 space-y-3 pt-2 border-t border-slate-200 dark:border-slate-700 mt-2">
+                <h3 className="font-bold text-sm text-slate-700 dark:text-slate-300">
+                  Certificados Digitales (.crt y .key)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Debe generar estos archivos en el sitio web de ARCA y
+                  guardarlos en una carpeta segura del sistema.
+                </p>
+
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">
+                    Ruta al Certificado (.crt)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={taxCertPathLocal}
+                      onChange={(e) => setTaxCertPathLocal(e.target.value)}
+                      className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-xs font-mono"
+                      placeholder="C:\Kiosco\Certificados\produccion.crt"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">
+                    Ruta a la Llave Privada (.key)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={taxKeyPathLocal}
+                      onChange={(e) => setTaxKeyPathLocal(e.target.value)}
+                      className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-xs font-mono"
+                      placeholder="C:\Kiosco\Certificados\produccion.key"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Sección Configuración de Email */}
         <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg transition-colors">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800 dark:text-white">
@@ -569,11 +705,11 @@ const ConfiguracionScreen = () => {
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800 dark:text-white">
             <Monitor className="text-slate-400" /> Apariencia
           </h2>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <button
               onClick={() => setSelectedMode("light")}
               className={`
-                px-4 py-2 rounded-lg font-bold border-2 transition-all flex items-center gap-2
+                px-4 py-3 rounded-lg font-bold border-2 transition-all flex items-center gap-2
                 ${
                   selectedMode === "light"
                     ? "bg-white border-blue-500 text-blue-600 shadow-md"
@@ -586,7 +722,7 @@ const ConfiguracionScreen = () => {
             <button
               onClick={() => setSelectedMode("dark")}
               className={`
-                px-4 py-2 rounded-lg font-bold border-2 transition-all flex items-center gap-2
+                px-4 py-3 rounded-lg font-bold border-2 transition-all flex items-center gap-2
                 ${
                   selectedMode === "dark"
                     ? "bg-slate-900 border-blue-500 text-blue-400 shadow-md"
@@ -596,7 +732,24 @@ const ConfiguracionScreen = () => {
             >
               <Moon size={20} /> Modo Oscuro
             </button>
+            <button
+              onClick={() => setSelectedMode("auto")}
+              className={`
+                px-4 py-3 rounded-lg font-bold border-2 transition-all flex items-center gap-2
+                ${
+                  selectedMode === "auto"
+                    ? "bg-gradient-to-r from-orange-100 to-slate-900 border-blue-500 text-blue-600 dark:text-blue-400 shadow-md"
+                    : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-transparent hover:bg-slate-300 dark:hover:bg-slate-700"
+                }
+              `}
+            >
+              <Archive size={20} /> Automático
+            </button>
           </div>
+          <p className="text-xs text-slate-500 mt-2">
+            El modo automático alterna entre claro y oscuro según la hora (07:00
+            - 20:00).
+          </p>
         </div>
 
         {/* Botón Guardar */}

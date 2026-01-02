@@ -152,6 +152,7 @@ export default function PosScreen() {
         } else {
           toast.error("Producto no encontrado");
         }
+        setCodigo(""); // Limpiar campo siempre
       });
     });
 
@@ -159,6 +160,150 @@ export default function PosScreen() {
       if (removeListener) removeListener();
     };
   }, []);
+  // ═══════════════════════════════════════════════════════════
+  // DETECCIÓN AUTOMÁTICA DE PROMOS
+  // ═══════════════════════════════════════════════════════════
+  const [activePromos, setActivePromos] = useState([]);
+
+  // Cargar promos al inicio
+  useEffect(() => {
+    window.api.getAllActivePromos().then((promos) => {
+      setActivePromos(promos);
+    });
+  }, []);
+
+  // Verificar si el carrito califica para una promo
+  useEffect(() => {
+    if (carrito.length === 0 || activePromos.length === 0) return;
+
+    // Algoritmo:
+    // 1. Recorrer promos activas
+    // 2. Para cada promo, verificar si tenemos los ingredientes en el carrito
+    // 3. Importante: Chequear que la promo NO esté ya en el carrito (para no sugerir lo que ya agregaron)
+
+    activePromos.forEach((promo) => {
+      // Si la promo ya está en el carrito, ignorar (asumimos que ya la están comprando)
+      // Opcional: Podríamos ser más listos y ver si compraron "otra" promo igual,
+      // pero por simplicidad, si el producto PROMO ID X está en carrito, no avisamos X.
+      const isPromoInCart = carrito.some((item) => item.id === promo.id);
+      if (isPromoInCart) return;
+
+      // Verificar ingredientes
+      // promo.items = [{ product_id, quantity }, ...]
+      let hasAllIngredients = true;
+      let multiplier = Infinity; // Cuantas veces podemos aplicar la promo
+
+      promo.items.forEach((promoItem) => {
+        const cartItem = carrito.find((p) => p.id === promoItem.product_id);
+        if (!cartItem) {
+          hasAllIngredients = false;
+          return;
+        }
+
+        const possibleTimes = Math.floor(
+          cartItem.cantidad / promoItem.quantity
+        );
+        if (possibleTimes < 1) {
+          hasAllIngredients = false;
+        } else {
+          multiplier = Math.min(multiplier, possibleTimes);
+        }
+      });
+
+      if (hasAllIngredients && multiplier > 0) {
+        // Encontramos una oportunidad de Promo!
+        // Verificar si ya avisamos recientemente de esta promo para evitar spam?
+        // Usaremos Toast con ID único para que no se apilen
+        toast(
+          (t) => (
+            <div className="flex flex-col gap-2">
+              <span className="font-bold flex items-center gap-2">
+                ¡Oferta Disponible!
+              </span>
+              <span className="text-sm">
+                Tienes productos para armar:
+                <br />
+                <span className="font-bold text-yellow-300">
+                  {multiplier}x {promo.name}
+                </span>
+              </span>
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  applyPromoToCart(promo, multiplier);
+                }}
+                className="mt-1 bg-white text-purple-600 px-3 py-1 rounded font-bold text-sm hover:bg-gray-100"
+              >
+                Aplicar Promo
+              </button>
+            </div>
+          ),
+          {
+            id: `promo-alert-${promo.id}`, // ID único por promo
+            duration: 8000,
+            icon: "✨",
+            style: {
+              background: "#7E22CE", // purple-700
+              color: "#fff",
+            },
+          }
+        );
+      }
+    });
+  }, [carrito, activePromos]);
+
+  // Aplicar la promo (Reemplazar ingredientes por el producto Promo)
+  const applyPromoToCart = (promo, count) => {
+    setCarrito((prev) => {
+      let newCart = [...prev];
+
+      // 1. Reducir/Eliminar ingredientes
+      promo.items.forEach((pItem) => {
+        const totalToRemove = pItem.quantity * count;
+
+        // Encontramos el item en el carrito (debería existir por la validación anterior)
+        const cartItemIndex = newCart.findIndex(
+          (c) => c.id === pItem.product_id
+        );
+
+        if (cartItemIndex !== -1) {
+          const currentQty = newCart[cartItemIndex].cantidad;
+          const remaining = parseFloat((currentQty - totalToRemove).toFixed(3));
+
+          if (remaining <= 0.001) {
+            // Eliminar
+            newCart.splice(cartItemIndex, 1);
+          } else {
+            // Reducir
+            newCart[cartItemIndex] = {
+              ...newCart[cartItemIndex],
+              cantidad: remaining,
+            };
+          }
+        }
+      });
+
+      // 2. Agregar Promo
+      // Usamos la misma lógica de agregar para no duplicar si ya existía
+      const promoInCart = newCart.find((p) => p.id === promo.id);
+      if (promoInCart) {
+        newCart = newCart.map((p) =>
+          p.id === promo.id
+            ? { ...p, cantidad: parseFloat((p.cantidad + count).toFixed(3)) }
+            : p
+        );
+      } else {
+        newCart.push({ ...promo, cantidad: count });
+      }
+
+      toast.success(`Se aplicó: ${promo.name}`);
+      // Sonido de éxito diferente (?)
+      playLowStockSound(); // Reutilizamos por ahora
+      return newCart;
+    });
+  };
+
+  // ═══════════════════════════════════════════════════════════
 
   // ═══════════════════════════════════════════════════════════
   // ESCÁNER FÍSICO (USB) Y ATAJOS DE TECLADO
@@ -354,48 +499,56 @@ export default function PosScreen() {
       return;
     }
 
-    setCarrito((prev) => {
-      const existe = prev.find((p) => p.id === producto.id);
-      const cantidadActual = existe ? existe.cantidad : 0;
-      const nuevaCantidad = parseFloat(
-        (cantidadActual + cantidadToAdd).toFixed(3)
+    // 3. Calcular nueva cantidad proyectada para validar stock antes de actualizar estado
+    const existe = carrito.find((p) => p.id === producto.id);
+    const cantidadActual = existe ? existe.cantidad : 0;
+    const nuevaCantidad = parseFloat(
+      (cantidadActual + cantidadToAdd).toFixed(3)
+    );
+
+    // Validación de Stock (Solo si NO es promo)
+    if (!producto.is_promo && nuevaCantidad > producto.stock_quantity) {
+      toast.error(`Stock insuficiente (Max: ${producto.stock_quantity})`);
+      return;
+    }
+
+    // Alerta de Stock Mínimo
+    const stockRestante = producto.stock_quantity - nuevaCantidad;
+    // Solo mostrar alerta si cruzamos el umbral o si ya estabamos abajo pero agregamos mas?
+    // Mejor solo mostrar si queda poco stock, independientemente de si ya mostramos antes,
+    // pero idealmente una vez por accion.
+    if (stockRestante <= producto.min_stock) {
+      toast(
+        (t) => (
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="text-white" size={20} />
+            <span className="font-bold">
+              Stock bajo: Quedan {stockRestante}
+            </span>
+          </div>
+        ),
+        {
+          id: `low-stock-${producto.id}`, // ID único para prevenir duplicados por hot-toast si se llamara rapido
+          style: {
+            background: "#EF4444",
+            color: "#FFFFFF",
+            padding: "12px",
+            borderRadius: "12px",
+            fontWeight: "600",
+            boxShadow: "0 4px 12px rgba(239, 68, 68, 0.3)",
+            border: "1px solid #B91C1C",
+          },
+          duration: 4000,
+        }
       );
+      playLowStockSound();
+    }
 
-      // Validación de Stock (Solo si NO es promo)
-      if (!producto.is_promo && nuevaCantidad > producto.stock_quantity) {
-        toast.error(`Stock insuficiente (Max: ${producto.stock_quantity})`);
-        return prev;
-      }
+    setCarrito((prev) => {
+      // Re-buscar en prev para seguridad (aunque 'existe' calculado afuera deberia coincidir en este ciclo)
+      const currentExiste = prev.find((p) => p.id === producto.id);
 
-      // Alerta de Stock Mínimo
-      const stockRestante = producto.stock_quantity - nuevaCantidad;
-      if (stockRestante <= producto.min_stock) {
-        toast(
-          (t) => (
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="text-white" size={20} />
-              <span className="font-bold">
-                Stock bajo: Quedan {stockRestante}
-              </span>
-            </div>
-          ),
-          {
-            style: {
-              background: "#EF4444", // Red-500
-              color: "#FFFFFF",
-              padding: "12px",
-              borderRadius: "12px",
-              fontWeight: "600",
-              boxShadow: "0 4px 12px rgba(239, 68, 68, 0.3)",
-              border: "1px solid #B91C1C",
-            },
-            duration: 4000,
-          }
-        );
-        playLowStockSound();
-      }
-
-      if (existe) {
+      if (currentExiste) {
         return prev.map((p) =>
           p.id === producto.id ? { ...p, cantidad: nuevaCantidad } : p
         );
@@ -428,7 +581,7 @@ export default function PosScreen() {
     const val = e.target.value;
     setCodigo(val);
 
-    if (val.length > 2) {
+    if (val.length > 0) {
       try {
         const results = await window.api.searchProducts(val);
         setSuggestions(results);
@@ -442,27 +595,28 @@ export default function PosScreen() {
 
   // Actualizar cantidad de producto en carrito
   const updateQuantity = (id, delta) => {
+    // Calcular validaciones FUERA del setCarrito
+    // Necesitamos el item actual del carrito (estado 'carrito')
+    const item = carrito.find((p) => p.id === id);
+    if (!item) return;
+
+    const nuevaCantidad = item.cantidad + delta;
+
+    // Si intenta bajar de 1, no hacer nada (o dejar que la UI lo maneje, aqui retornamos)
+    if (nuevaCantidad < 1) return;
+
+    // Validación de Stock al incrementar (Solo si NO es promo)
+    if (!item.is_promo && delta > 0 && nuevaCantidad > item.stock_quantity) {
+      toast.error(`Stock insuficiente (Max: ${item.stock_quantity})`);
+      return;
+    }
+
     setCarrito((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          const nuevaCantidad = item.cantidad + delta;
-
-          // Si intenta bajar de 1, no hacer nada (o eliminar)
-          if (nuevaCantidad < 1) return item;
-
-          // Validación de Stock al incrementar (Solo si NO es promo)
-          if (
-            !item.is_promo &&
-            delta > 0 &&
-            nuevaCantidad > item.stock_quantity
-          ) {
-            toast.error(`Stock insuficiente (Max: ${item.stock_quantity})`);
-            return item;
-          }
-
-          return { ...item, cantidad: nuevaCantidad };
+      prev.map((prod) => {
+        if (prod.id === id) {
+          return { ...prod, cantidad: nuevaCantidad };
         }
-        return item;
+        return prod;
       })
     );
   };
@@ -508,6 +662,42 @@ export default function PosScreen() {
           });
         }
 
+        // --- INTEGRACIÓN ARCA (FACTURA ELECTRÓNICA) ---
+        // Verificar configuración (cargamos config en useEffect o usamos window.api ?)
+        // Lo mejor es hacer una llamada rápida o usar el ConfigContext si lo tuvieramos envuelto.
+        // Como PosScreen no está bajo ConfigProvider en App.jsx (Route path="/pos" está FUERA de MainLayout que tiene ConfigProvider?)
+        // Ah, App.jsx: ConfigProvider envuelve TODO. OK.
+        // Pero PosScreen es una ruta hermana de MainLayout routes.
+        // Sí, ConfigProvider envuelve Routes. Así que PODEMOS usar useConfig().
+
+        // Sin embargo, para no refactorizar imports ahora mismo, haremos la llamada Directa al backend
+        // que ya verifica si está enabled. El handler 'create-electronic-invoice' verifica 'tax_enabled'.
+        // Solo llamamos y si retorna "disabled", ignoramos silenciosamente.
+
+        // Hacemos esto async (sin await) para no bloquear la UI? O mostramos "Emitiendo Factura"?
+        // Mejor mostrar un Toast de proceso.
+
+        window.api
+          .createElectronicInvoice({
+            saleId: resultado.saleId,
+            total: total,
+            items: carrito.map((i) => ({
+              title: i.name,
+              quantity: i.cantidad,
+              unit_price: i.sale_price,
+            })),
+            clientDoc: clienteSeleccionado ? clienteSeleccionado.dni : null, // Asumiendo DNI = CUIT para consumidor final identificado
+          })
+          .then((res) => {
+            if (res.success) {
+              toast.success(`CAE Autorizado: ${res.cae}`, { duration: 6000 });
+            } else if (
+              res.message !== "Facturación electrónica deshabilitada"
+            ) {
+              toast.error(`Error AFIP: ${res.message}`, { duration: 6000 });
+            }
+          });
+
         // PREPARAR PARA EMAIL
         setLastSale({
           id: resultado.saleId,
@@ -534,7 +724,10 @@ export default function PosScreen() {
       }
     } catch (error) {
       console.error("Error al procesar pago:", error);
-      return { success: false, message: "Error inesperado" };
+      return {
+        success: false,
+        message: error.message || "Error desconocido en createSale",
+      };
     }
   };
 
@@ -542,7 +735,7 @@ export default function PosScreen() {
   // RENDER
   // ═══════════════════════════════════════════════════════════
   return (
-    <div className="flex h-full gap-4 text-slate-900 dark:text-white">
+    <div className="flex flex-col lg:flex-row h-full gap-4 text-slate-900 dark:text-white overflow-hidden">
       {/* Modal de Pago */}
       <PaymentModal
         isOpen={modalPagoAbierto}
@@ -594,21 +787,30 @@ export default function PosScreen() {
                 type="email"
                 autoFocus
                 className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="cliente@email.com"
+                placeholder="facucasla2015@gmail.com"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (emailToSend) {
+                      document.getElementById("btn-send-email")?.click();
+                    }
+                  }
+                }}
                 value={emailToSend}
                 onChange={(e) => setEmailToSend(e.target.value)}
               />
             </div>
-
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setEmailModalOpen(false)}
-                className="px-4 py-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
+                className="px-4 py-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
               >
                 No enviar
               </button>
               <button
+                id="btn-send-email"
                 onClick={async () => {
+                  // Generar PDF y Enviar
                   if (!emailToSend.includes("@")) {
                     toast.error("Email inválido");
                     return;
@@ -1042,7 +1244,7 @@ export default function PosScreen() {
       {/* ════════════════════════════════════════════════════════ */}
       {/* SECCIÓN DERECHA: TOTALES Y ACCIONES */}
       {/* ════════════════════════════════════════════════════════ */}
-      <div className="w-96 flex flex-col gap-4">
+      <div className="w-full lg:w-96 flex flex-col gap-4 shrink-0 h-auto lg:h-full overflow-y-auto lg:overflow-visible">
         {/* Tarjeta de Usuario / Info */}
         <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg space-y-3 transition-colors duration-300">
           <div className="flex justify-between items-center text-slate-500 dark:text-slate-400 text-sm">

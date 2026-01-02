@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -55,17 +55,30 @@ export default function MainLayout() {
 
   const theme = getThemeClasses(); // Obtener clases del tema actual
 
+  // Auto-collapse on small screens
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setIsCollapsed(true);
+      }
+    };
+    // Initial check
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   // Estilos dinámicos para el sidebar según el tema
   const sidebarClass = `${
     isCollapsed ? "w-20" : "w-64"
-  } flex flex-col transition-all duration-300 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-r border-slate-200 dark:border-slate-700 relative`;
+  } flex flex-col transition-all duration-300 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-r border-slate-200 dark:border-slate-700 relative shrink-0`;
 
   // Helper para links activos (opcional, para highlights)
   const location = useLocation();
   const isActive = (path) => location.pathname === path;
 
   const getLinkClass = (path) => `
-    flex items-center gap-3 p-3 rounded transition-all duration-200 font-medium whitespace-nowrap overflow-hidden
+    flex items-center gap-3 p-3 rounded-xl transition-all duration-200 font-medium whitespace-nowrap overflow-hidden
     ${
       isActive(path)
         ? `${theme.bg} text-white shadow-lg`
@@ -75,15 +88,15 @@ export default function MainLayout() {
   `;
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white transition-colors duration-300">
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white transition-colors duration-300 overflow-hidden">
       {/* Sidebar Lateral Fijo */}
       <aside className={sidebarClass}>
         {/* Botón de Colapsar (flotante en el borde) */}
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className={`absolute -right-3 top-9 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 rounded-full p-1 shadow-md hover:text-slate-900 dark:hover:text-white transition-transform z-50`}
+          className={`absolute -right-4 top-9 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 rounded-full w-8 h-8 flex items-center justify-center shadow-md hover:text-slate-900 dark:hover:text-white transition-transform z-50`}
         >
-          {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </button>
 
         <div className="p-6 text-xl font-bold border-b border-slate-200 dark:border-slate-700 flex items-center gap-2 overflow-hidden whitespace-nowrap h-[88px]">

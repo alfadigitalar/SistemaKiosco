@@ -18,20 +18,26 @@ const ReportesScreen = () => {
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState(null);
 
-  // Default: Últimos 30 días
+  // Helper to get local ISO date (YYYY-MM-DD)
+  const getLocalDate = (dateObj = new Date()) => {
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const day = String(dateObj.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  // Default: Últimos 30 días (Local Time)
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
-    return d.toISOString().split("T")[0];
+    return getLocalDate(d);
   });
-  const [endDate, setEndDate] = useState(
-    () => new Date().toISOString().split("T")[0]
-  );
+  const [endDate, setEndDate] = useState(() => getLocalDate(new Date()));
 
   const fetchReport = async () => {
     setLoading(true);
     try {
-      const data = await window.api.invoke("get-advanced-report", {
+      const data = await window.api.getAdvancedReport({
         startDate,
         endDate,
       });
@@ -163,15 +169,21 @@ const ReportesScreen = () => {
       <div className="flex items-end justify-between h-64 gap-2 w-full pt-6">
         {data.map((item, idx) => {
           const heightPercent = maxVal > 0 ? (item.total / maxVal) * 100 : 0;
+
+          // Parse manual de YYYY-MM-DD para evitar errores de UTC
+          const [y, m, d] = item.date.split("-");
+          const day = d;
+          const month = m;
+
           return (
             <div
               key={idx}
-              className="flex-1 flex flex-col items-center group relative min-w-[20px]"
+              className="flex-1 flex flex-col items-center justify-end group relative min-w-[20px] h-full"
             >
               {/* Tooltip */}
               <div className="absolute -top-12 bg-slate-800 text-white text-xs p-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
                 <p className="font-bold">
-                  {new Date(item.date).toLocaleDateString()}
+                  {day}/{month}/{y}
                 </p>
                 <p>${item.total.toLocaleString()}</p>
               </div>
@@ -184,8 +196,7 @@ const ReportesScreen = () => {
 
               {/* Label */}
               <span className="text-[10px] text-slate-500 mt-2 rotate-45 origin-left translate-y-2 w-full overflow-hidden truncate">
-                {new Date(item.date).getDate()}/
-                {new Date(item.date).getMonth() + 1}
+                {day}/{month}
               </span>
             </div>
           );
@@ -293,7 +304,7 @@ const ReportesScreen = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             {/* Main Chart */}
             <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
               <div className="flex justify-between items-center mb-6">
@@ -314,7 +325,7 @@ const ReportesScreen = () => {
                   </button>
                 </div>
               </div>
-              <div className="w-full h-fit min-h-[300px]">
+              <div className="w-full h-auto">
                 <BarChart data={reportData.salesByDay} />
               </div>
             </div>
@@ -329,19 +340,7 @@ const ReportesScreen = () => {
                     className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl hover:bg-slate-100 transition"
                   >
                     <div className="flex items-center gap-3">
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm
-                          ${
-                            idx === 0
-                              ? "bg-yellow-100 text-yellow-700"
-                              : idx === 1
-                              ? "bg-gray-100 text-gray-700"
-                              : idx === 2
-                              ? "bg-orange-100 text-orange-700"
-                              : "bg-slate-200 text-slate-600"
-                          }
-                        `}
-                      >
+                      <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-sm bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
                         #{idx + 1}
                       </div>
                       <div>

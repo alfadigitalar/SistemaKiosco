@@ -30,13 +30,17 @@ function registerIpcHandlers() {
         WHERE p.is_active = 1 
         ORDER BY p.name ASC
       `;
-      
+
       const rows = await all(query);
-      
+
       // Sobrescribimos stock_quantity si es promo
-      return rows.map(p => ({
+      return rows.map((p) => ({
         ...p,
-        stock_quantity: p.is_promo ? (p.calculated_promo_stock !== null ? p.calculated_promo_stock : 0) : p.stock_quantity
+        stock_quantity: p.is_promo
+          ? p.calculated_promo_stock !== null
+            ? p.calculated_promo_stock
+            : 0
+          : p.stock_quantity,
       }));
     } catch (error) {
       console.error("Error al obtener productos:", error);
@@ -59,12 +63,14 @@ function registerIpcHandlers() {
         FROM products p
         WHERE p.barcode = ? AND p.is_active = 1
       `;
-      
+
       const row = await get(query, [barcode]);
-      
+
       if (row) {
-        row.stock_quantity = row.is_promo 
-          ? (row.calculated_promo_stock !== null ? row.calculated_promo_stock : 0)
+        row.stock_quantity = row.is_promo
+          ? row.calculated_promo_stock !== null
+            ? row.calculated_promo_stock
+            : 0
           : row.stock_quantity;
       }
       return row;
@@ -90,12 +96,16 @@ function registerIpcHandlers() {
         WHERE p.name LIKE ? AND p.is_active = 1 
         LIMIT 20
       `;
-      
+
       const rows = await all(sql, [`%${query}%`]);
-      
-      return rows.map(p => ({
+
+      return rows.map((p) => ({
         ...p,
-        stock_quantity: p.is_promo ? (p.calculated_promo_stock !== null ? p.calculated_promo_stock : 0) : p.stock_quantity
+        stock_quantity: p.is_promo
+          ? p.calculated_promo_stock !== null
+            ? p.calculated_promo_stock
+            : 0
+          : p.stock_quantity,
       }));
     } catch (error) {
       console.error("Error al buscar productos:", error);
@@ -124,12 +134,12 @@ function registerIpcHandlers() {
         `INSERT INTO products (barcode, name, cost_price, sale_price, stock_quantity, min_stock, category_id, supplier_id, measurement_unit, is_promo)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          barcode,
-          name,
-          cost_price,
-          sale_price,
-          stock_quantity,
-          min_stock,
+          barcode || null,
+          name || "", // Prevent NOT NULL error if undefined
+          cost_price || 0,
+          sale_price || 0,
+          stock_quantity || 0,
+          min_stock || 0,
           category_id,
           supplier_id,
           measurement_unit || "un",
@@ -184,12 +194,12 @@ function registerIpcHandlers() {
          SET barcode=?, name=?, cost_price=?, sale_price=?, stock_quantity=?, min_stock=?, category_id=?, supplier_id=?, measurement_unit=?, is_promo=?
          WHERE id=?`,
         [
-          barcode,
-          name,
-          cost_price,
-          sale_price,
-          stock_quantity,
-          min_stock,
+          barcode || null, // Allow NULL if empty string
+          name || "",
+          cost_price || 0,
+          sale_price || 0,
+          stock_quantity || 0,
+          min_stock || 0,
           category_id,
           supplier_id,
           measurement_unit || "un",
@@ -251,6 +261,35 @@ function registerIpcHandlers() {
       return items;
     } catch (error) {
       console.error("Error al obtener items de promo:", error);
+      return [];
+    }
+  });
+
+  // Obtener todas las promos activas con sus items (para detección automática en POS)
+  ipcMain.handle("get-all-active-promos", async () => {
+    try {
+      // 1. Obtener productos que son promos activos
+      const promos = await all(
+        "SELECT * FROM products WHERE is_promo = 1 AND is_active = 1"
+      );
+
+      // 2. Para cada promo, obtener sus items
+      const promosWithItems = await Promise.all(
+        promos.map(async (promo) => {
+          const promoItems = await all(
+            `SELECT pi.*, p.name, p.barcode 
+             FROM promo_items pi
+             JOIN products p ON pi.product_id = p.id
+             WHERE pi.promo_id = ?`,
+            [promo.id]
+          );
+          return { ...promo, items: promoItems };
+        })
+      );
+
+      return promosWithItems;
+    } catch (error) {
+      console.error("Error al obtener promos activas:", error);
       return [];
     }
   });
@@ -596,6 +635,51 @@ function registerIpcHandlers() {
   ipcMain.handle("add-cash-movement", async (event, movement) => {
     try {
       const { type, amount, description, userId } = movement;
+
+      // VALIDACIÓN DE SALDO NEGATIVO
+      if (type === "withdrawal") {
+        // 1. Obtener Sesión Actual
+        const session = await get(
+          "SELECT * FROM cash_sessions WHERE closed_at IS NULL ORDER BY id DESC LIMIT 1"
+        );
+
+        if (!session) throw new Error("No hay caja abierta.");
+
+        // 2. Calcular Saldo Actual
+        const startDate = session.opened_at;
+
+        // Ventas Efectivo
+        const salesResult = await get(
+          "SELECT SUM(total_amount) as total FROM sales WHERE timestamp >= ? AND payment_method = 'efectivo'",
+          [startDate]
+        );
+        const totalSales = salesResult.total || 0;
+
+        // Movimientos Previos
+        const movementsResult = await all(
+          "SELECT type, SUM(amount) as total FROM movements WHERE timestamp >= ? GROUP BY type",
+          [startDate]
+        );
+
+        let totalIn = 0;
+        let totalOut = 0;
+        movementsResult.forEach((row) => {
+          if (row.type === "entry") totalIn += row.total;
+          if (row.type === "withdrawal") totalOut += row.total;
+        });
+
+        const currentBalance =
+          session.initial_amount + totalSales + totalIn - totalOut;
+
+        // 3. Verificar si alcanza
+        if (amount > currentBalance) {
+          return {
+            success: false,
+            message: `Saldo insuficiente. Disponible: $${currentBalance.toLocaleString()}`,
+          };
+        }
+      }
+
       await run(
         "INSERT INTO movements (type, amount, description, user_id) VALUES (?, ?, ?, ?)",
         [type, amount, description, userId]
@@ -698,6 +782,82 @@ function registerIpcHandlers() {
       };
     }
   });
+
+  // Reporte Avanzado (Rango de Fechas)
+  ipcMain.handle(
+    "get-advanced-report",
+    async (event, { startDate, endDate }) => {
+      try {
+        // Validar fechas
+        if (!startDate || !endDate) {
+          throw new Error("Se requieren fechas de inicio y fin.");
+        }
+
+        const start = startDate + " 00:00:00";
+        const end = endDate + " 23:59:59";
+
+        // 1. Resumen General (Ventas, Ganancia, Transacciones, Ticket Promedio)
+        const summaryQuery = `
+        SELECT 
+          COUNT(s.id) as totalTransactions,
+          SUM(s.total_amount) as totalSales,
+          AVG(s.total_amount) as averageTicket,
+          SUM(
+            (SELECT SUM((si.unit_price_at_sale - COALESCE(p.cost_price, 0)) * si.quantity)
+             FROM sale_items si
+             JOIN products p ON si.product_id = p.id
+             WHERE si.sale_id = s.id)
+          ) as estimatedProfit
+        FROM sales s
+        WHERE s.timestamp >= ? AND s.timestamp <= ?
+      `; // SQLite uses ISO strings for comparison
+
+        const summary = await get(summaryQuery, [start, end]);
+
+        // 2. Ventas por Día (Para el Gráfico)
+        const salesByDayQuery = `
+         SELECT 
+           date(timestamp) as date,
+           SUM(total_amount) as total
+         FROM sales
+         WHERE timestamp >= ? AND timestamp <= ?
+         GROUP BY date(timestamp)
+         ORDER BY date(timestamp) ASC
+       `;
+        const salesByDay = await all(salesByDayQuery, [start, end]);
+
+        // 3. Top Productos más vendidos en el periodo
+        const topProductsQuery = `
+         SELECT 
+           p.name,
+           SUM(si.quantity) as quantity,
+           SUM(si.subtotal) as total
+         FROM sale_items si
+         JOIN sales s ON si.sale_id = s.id
+         JOIN products p ON si.product_id = p.id
+         WHERE s.timestamp >= ? AND s.timestamp <= ?
+         GROUP BY si.product_id
+         ORDER BY quantity DESC
+         LIMIT 10
+       `;
+        const topProducts = await all(topProductsQuery, [start, end]);
+
+        return {
+          summary: {
+            totalTransactions: summary.totalTransactions || 0,
+            totalSales: summary.totalSales || 0,
+            averageTicket: summary.averageTicket || 0,
+            estimatedProfit: summary.estimatedProfit || 0,
+          },
+          salesByDay: salesByDay || [],
+          topProducts: topProducts || [],
+        };
+      } catch (error) {
+        console.error("Error en reporte avanzado:", error);
+        return { error: error.message };
+      }
+    }
+  );
 
   // ═══════════════════════════════════════════════════════════
   // HANDLERS DE DEVOLUCIONES
@@ -1285,6 +1445,83 @@ function registerIpcHandlers() {
   // ═══════════════════════════════════════════════════════════
   // HANDLERS DE EMAIL (Fase 35)
   // ═══════════════════════════════════════════════════════════
+
+  // ═══════════════════════════════════════════════════════════
+  // HANDLERS DE ARCA / AFIP (Fase 40)
+  // ═══════════════════════════════════════════════════════════
+  const { createInvoice } = require("./afipService");
+
+  ipcMain.handle(
+    "create-electronic-invoice",
+    async (event, { saleId, total, items, clientDoc }) => {
+      try {
+        // 1. Obtener configuración
+        const settingsRows = await all(
+          "SELECT key, value FROM settings WHERE key IN ('tax_enabled', 'tax_cuit', 'tax_sales_point', 'tax_cert_path', 'tax_key_path')"
+        );
+        const config = {};
+        settingsRows.forEach((row) => (config[row.key] = row.value));
+
+        // Validar si está habilitado
+        if (config.tax_enabled !== "true") {
+          return {
+            success: false,
+            message: "Facturación electrónica deshabilitada",
+          };
+        }
+
+        // Validar datos mínimos
+        if (
+          !config.tax_cuit ||
+          !config.tax_sales_point ||
+          !config.tax_cert_path ||
+          !config.tax_key_path
+        ) {
+          return {
+            success: false,
+            message: "Faltan datos de configuración de AFIP",
+          };
+        }
+
+        const afipConfig = {
+          cuit: config.tax_cuit,
+          salesPoint: config.tax_sales_point,
+          certPath: config.tax_cert_path,
+          keyPath: config.tax_key_path,
+        };
+
+        // 2. Llamar Servicio
+        const result = await createInvoice(afipConfig, {
+          total,
+          items,
+          clientDoc,
+        });
+
+        if (result.success) {
+          // 3. Guardar en BD
+          await run(
+            `
+             UPDATE sales 
+             SET invoice_type = ?, invoice_number = ?, cae = ?, cae_expiration = ?
+             WHERE id = ?
+          `,
+            [
+              result.voucherType.toString(),
+              result.voucherNumber,
+              result.cae,
+              result.caeFchVto,
+              saleId,
+            ]
+          );
+        }
+
+        return result;
+      } catch (error) {
+        console.error("Error en create-electronic-invoice:", error);
+        return { success: false, message: error.message };
+      }
+    }
+  );
 
   ipcMain.handle(
     "send-email-ticket",

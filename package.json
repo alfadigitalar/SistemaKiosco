@@ -33,6 +33,7 @@
     "wait-on": "^8.0.1"
   },
   "dependencies": {
+    "@afipsdk/afip.js": "^1.2.2",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
     "express": "^5.2.1",

@@ -6,11 +6,12 @@ import {
   Wallet,
   CheckCircle,
   UserCheck,
+  QrCode,
 } from "lucide-react";
 
 /**
  * Modal de Pago
- * Permite seleccionar método de pago (Efectivo, Tarjeta, Mixto)
+ * Permite seleccionar método de pago (Efectivo, Tarjeta, Mixto, Mercado Pago)
  * y procesar la transacción con cálculo de vuelto.
  */
 export default function PaymentModal({
@@ -57,7 +58,11 @@ export default function PaymentModal({
     if (metodo === "efectivo") {
       return parseFloat(montoRecibido) >= total;
     }
-    if (metodo === "tarjeta" || metodo === "checking_account") {
+    if (
+      metodo === "tarjeta" ||
+      metodo === "checking_account" ||
+      metodo === "mercadopago"
+    ) {
       return true; // Siempre válido
     }
     if (metodo === "mixto") {
@@ -107,10 +112,33 @@ export default function PaymentModal({
     }
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter") {
-      procesarPago();
-    }
+  // Enable Enter key to confirm payment globally in the modal
+  React.useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (e.key === "Enter" && isOpen) {
+        e.preventDefault();
+        // Solo procesar si el pago es válido y no se está procesando ya
+        if (pagoValido() && !procesando) {
+          procesarPago();
+        }
+      }
+      // Escape to close
+      if (e.key === "Escape" && isOpen) {
+        handleClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [isOpen, metodo, montoRecibido, montoEfectivo, montoTarjeta, procesando]); // Dependencias para que pagoValido tenga estado fresco
+
+  // Input specific handler can be removed or kept as redundancy,
+  // but global window listener catches bubbling events anyway.
+  // We'll keep it simple and rely on global listener.
+  const handleInputKeyDown = (e) => {
+    // Prevent double trigger if global listener catches it
+    // Actually, if we use window listener, we don't need this on inputs.
+    if (e.key === "Enter") e.stopPropagation();
   };
 
   if (!isOpen) return null;
@@ -159,8 +187,8 @@ export default function PaymentModal({
                 </p>
               </div>
 
-              {/* Selector de Método */}
-              <div className="grid grid-cols-3 gap-2 mb-6">
+              {/* Grid 2 filas */}
+              <div className="grid grid-cols-2 gap-2 mb-6">
                 <button
                   onClick={() => setMetodo("efectivo")}
                   className={`p-3 rounded-xl flex flex-col items-center gap-1 transition border-2 ${
@@ -193,6 +221,17 @@ export default function PaymentModal({
                 >
                   <Wallet size={24} />
                   <span className="text-sm font-medium">Mixto</span>
+                </button>
+                <button
+                  onClick={() => setMetodo("mercadopago")}
+                  className={`p-3 rounded-xl flex flex-col items-center gap-1 transition border-2 ${
+                    metodo === "mercadopago"
+                      ? "bg-cyan-900/30 border-cyan-500 text-cyan-400"
+                      : "bg-slate-700 border-transparent text-slate-300 hover:border-slate-500"
+                  }`}
+                >
+                  <QrCode size={24} />
+                  <span className="text-sm font-medium">Mercado Pago</span>
                 </button>
               </div>
 
@@ -237,7 +276,6 @@ export default function PaymentModal({
                       type="number"
                       value={montoRecibido}
                       onChange={(e) => setMontoRecibido(e.target.value)}
-                      onKeyDown={handleKeyDown}
                       className="w-full p-3 bg-slate-900 border border-slate-600 rounded-xl text-2xl text-white text-center font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
                       placeholder="0.00"
                       autoFocus
@@ -266,34 +304,47 @@ export default function PaymentModal({
                 </div>
               )}
 
+              {metodo === "mercadopago" && (
+                <div className="text-center p-6 bg-slate-900 rounded-xl border border-cyan-500/30">
+                  <QrCode className="mx-auto mb-2 text-cyan-400" size={48} />
+                  <p className="text-cyan-400 font-bold text-lg mb-1">
+                    Mercado Pago
+                  </p>
+                  <p className="text-slate-400 text-sm">
+                    Solicite al cliente que escanee el QR o realice la
+                    transferencia.
+                  </p>
+                </div>
+              )}
+
               {metodo === "mixto" && (
                 <div className="space-y-4">
-                  <div>
-                    <label className="text-sm text-slate-400 mb-1 block">
-                      Monto en Efectivo
-                    </label>
-                    <input
-                      type="number"
-                      value={montoEfectivo}
-                      onChange={(e) => setMontoEfectivo(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      className="w-full p-3 bg-slate-900 border border-slate-600 rounded-xl text-xl text-white text-center font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
-                      placeholder="0.00"
-                      autoFocus
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm text-slate-400 mb-1 block">
-                      Monto con Tarjeta
-                    </label>
-                    <input
-                      type="number"
-                      value={montoTarjeta}
-                      onChange={(e) => setMontoTarjeta(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      className="w-full p-3 bg-slate-900 border border-slate-600 rounded-xl text-xl text-white text-center font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="0.00"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm text-slate-400 mb-1 block">
+                        Efectivo
+                      </label>
+                      <input
+                        type="number"
+                        value={montoEfectivo}
+                        onChange={(e) => setMontoEfectivo(e.target.value)}
+                        className="w-full p-3 bg-slate-900 border border-slate-600 rounded-xl text-xl text-white text-center font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder="0.00"
+                        autoFocus
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-slate-400 mb-1 block">
+                        Tarjeta
+                      </label>
+                      <input
+                        type="number"
+                        value={montoTarjeta}
+                        onChange={(e) => setMontoTarjeta(e.target.value)}
+                        className="w-full p-3 bg-slate-900 border border-slate-600 rounded-xl text-xl text-white text-center font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="0.00"
+                      />
+                    </div>
                   </div>
                   <div className="text-center p-3 bg-slate-900 rounded-xl">
                     <p className="text-sm text-slate-400">Total Ingresado</p>

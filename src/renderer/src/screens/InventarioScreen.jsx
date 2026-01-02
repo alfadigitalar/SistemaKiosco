@@ -143,13 +143,13 @@ const InventarioScreen = () => {
           setSelectedComponents(
             items.map((i) => {
               // Buscar el producto en la lista actual para tener el stock actualizado
-              const currentProd = products.find(p => p.id === i.product_id);
+              const currentProd = products.find((p) => p.id === i.product_id);
               return {
                 id: i.product_id,
                 name: i.name,
                 barcode: i.barcode,
                 qty: i.quantity,
-                stock_quantity: currentProd ? currentProd.stock_quantity : 0 // Necesario para cálculo
+                stock_quantity: currentProd ? currentProd.stock_quantity : 0, // Necesario para cálculo
               };
             })
           );
@@ -571,7 +571,7 @@ const InventarioScreen = () => {
                       onChange={(e) =>
                         setFormData({ ...formData, barcode: e.target.value })
                       }
-                      placeholder="Escanea o escribe..."
+                      placeholder="Escanea o escribe (Opcional)..."
                     />
                     <Barcode className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 w-5 h-5" />
                   </div>
@@ -794,7 +794,9 @@ const InventarioScreen = () => {
                   <input
                     type="number"
                     className={`w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none transition-colors ${
-                      formData.is_promo ? "opacity-70 bg-slate-100 dark:bg-slate-700 cursor-not-allowed" : ""
+                      formData.is_promo
+                        ? "opacity-70 bg-slate-100 dark:bg-slate-700 cursor-not-allowed"
+                        : ""
                     }`}
                     value={formData.stock_quantity}
                     onChange={(e) =>
