@@ -106,11 +106,13 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm }) => {
       : 0;
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 transition-opacity duration-300">
-      <div className="bg-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-700 transform transition-all scale-100">
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-white">Procesar Pago</h2>
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-2 sm:p-4 transition-opacity duration-300">
+      <div className="bg-slate-800 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[95vh] border border-slate-700 transform transition-all scale-100">
+        <div className="p-4 sm:p-6 flex-shrink-0 border-b border-slate-700">
+          <div className="flex justify-between items-center mb-2 sm:mb-4">
+            <h2 className="text-xl sm:text-2xl font-bold text-white">
+              Procesar Pago
+            </h2>
             <button
               onClick={onClose}
               className="text-slate-400 hover:text-white transition"
@@ -119,77 +121,83 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm }) => {
             </button>
           </div>
 
-          <div className="text-center mb-8">
-            <p className="text-slate-400 text-sm mb-1 uppercase tracking-wider font-bold">
+          <div className="text-center">
+            <p className="text-slate-400 text-xs sm:text-sm mb-1 uppercase tracking-wider font-bold">
               Total a pagar
             </p>
-            <p className="text-5xl font-black text-green-400">
+            <p className="text-4xl sm:text-5xl font-black text-green-400">
               ${total.toFixed(2)}
             </p>
           </div>
+        </div>
 
-          <div className="grid grid-cols-2 gap-3 mb-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
             <button
               onClick={() => setMetodo("efectivo")}
-              className={`p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition border-2 ${
+              className={`p-3 sm:p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition border-2 ${
                 metodo === "efectivo"
                   ? "bg-green-600/20 border-green-500 text-green-400"
                   : "bg-slate-700/50 border-transparent text-slate-400 hover:bg-slate-700 hover:text-white"
               }`}
             >
-              <Banknote size={24} />
-              <span className="font-bold">Efectivo</span>
+              <Banknote size={20} className="sm:w-6 sm:h-6" />
+              <span className="font-bold text-sm sm:text-base">Efectivo</span>
             </button>
             <button
               onClick={() => setMetodo("tarjeta")}
-              className={`p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition border-2 ${
+              className={`p-3 sm:p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition border-2 ${
                 metodo === "tarjeta"
                   ? "bg-blue-600/20 border-blue-500 text-blue-400"
                   : "bg-slate-700/50 border-transparent text-slate-400 hover:bg-slate-700 hover:text-white"
               }`}
             >
-              <CreditCard size={24} />
-              <span className="font-bold">Tarjeta</span>
+              <CreditCard size={20} className="sm:w-6 sm:h-6" />
+              <span className="font-bold text-sm sm:text-base">Tarjeta</span>
             </button>
             <button
               onClick={() => setMetodo("mixto")}
-              className={`p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition border-2 ${
+              className={`p-3 sm:p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition border-2 ${
                 metodo === "mixto"
                   ? "bg-purple-600/20 border-purple-500 text-purple-400"
                   : "bg-slate-700/50 border-transparent text-slate-400 hover:bg-slate-700 hover:text-white"
               }`}
             >
-              <Wallet size={24} />
-              <span className="font-bold">Mixto</span>
+              <Wallet size={20} className="sm:w-6 sm:h-6" />
+              <span className="font-bold text-sm sm:text-base">Mixto</span>
             </button>
             <button
               onClick={() => setMetodo("mercadopago")}
-              className={`p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition border-2 ${
+              className={`p-3 sm:p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition border-2 ${
                 metodo === "mercadopago"
                   ? "bg-cyan-600/20 border-cyan-500 text-cyan-400"
                   : "bg-slate-700/50 border-transparent text-slate-400 hover:bg-slate-700 hover:text-white"
               }`}
             >
-              <Smartphone size={24} />
-              <span className="font-bold">Mercado Pago</span>
+              <Smartphone size={20} className="sm:w-6 sm:h-6" />
+              <span className="font-bold text-sm sm:text-base">
+                Mercado Pago
+              </span>
             </button>
           </div>
 
-          <div className="min-h-[160px]">
+          <div className="min-h-[100px]">
             {metodo === "efectivo" && (
               <div className="space-y-4">
-                <label className="text-sm text-slate-400 mb-1 block">
-                  Monto Recibido
-                </label>
-                <input
-                  type="number"
-                  value={montoRecibido}
-                  onChange={(e) => setMontoRecibido(e.target.value)}
-                  className="w-full p-3 bg-slate-900 border border-slate-600 rounded-xl text-2xl text-white text-center font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="0.00"
-                  autoFocus
-                />
-                <div className="flex justify-between items-center bg-slate-900 p-4 rounded-xl">
+                <div>
+                  <label className="text-sm text-slate-400 mb-1 block">
+                    Monto Recibido
+                  </label>
+                  <input
+                    type="number"
+                    value={montoRecibido}
+                    onChange={(e) => setMontoRecibido(e.target.value)}
+                    className="w-full p-3 bg-slate-900 border border-slate-600 rounded-xl text-2xl text-white text-center font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="0.00"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex justify-between items-center bg-slate-900 p-3 sm:p-4 rounded-xl">
                   <span className="text-slate-400">Vuelto</span>
                   <span
                     className={`text-2xl font-bold font-mono ${
@@ -207,7 +215,7 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm }) => {
                 <div className="w-16 h-16 rounded-full bg-blue-900/30 flex items-center justify-center text-blue-400">
                   <CreditCard size={32} />
                 </div>
-                <p className="text-slate-300">
+                <p className="text-slate-300 text-sm sm:text-base">
                   Procese el pago por <b>${total.toFixed(2)}</b> en el lector de
                   tarjetas.
                 </p>
@@ -219,7 +227,7 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm }) => {
                 <div className="w-16 h-16 rounded-full bg-cyan-900/30 flex items-center justify-center text-cyan-400">
                   <Smartphone size={32} />
                 </div>
-                <p className="text-slate-300">
+                <p className="text-slate-300 text-sm sm:text-base">
                   Solicite o muestre el QR por <b>${total.toFixed(2)}</b>.
                 </p>
               </div>
@@ -236,7 +244,7 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm }) => {
                       type="number"
                       value={montoEfectivo}
                       onChange={(e) => setMontoEfectivo(e.target.value)}
-                      className="w-full p-3 bg-slate-900 border border-slate-600 rounded-xl text-xl text-white text-center font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full p-2 sm:p-3 bg-slate-900 border border-slate-600 rounded-xl text-lg sm:text-xl text-white text-center font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
                       placeholder="0.00"
                       autoFocus
                     />
@@ -249,7 +257,7 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm }) => {
                       type="number"
                       value={montoTarjeta}
                       onChange={(e) => setMontoTarjeta(e.target.value)}
-                      className="w-full p-3 bg-slate-900 border border-slate-600 rounded-xl text-xl text-white text-center font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full p-2 sm:p-3 bg-slate-900 border border-slate-600 rounded-xl text-lg sm:text-xl text-white text-center font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="0.00"
                     />
                   </div>
@@ -272,7 +280,7 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm }) => {
         <button
           onClick={procesarPago}
           disabled={!pagoValido() || procesando}
-          className="w-full bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-6 text-xl transition flex items-center justify-center gap-3"
+          className="w-full bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 sm:py-6 text-lg sm:text-xl transition flex-shrink-0 flex items-center justify-center gap-3 border-t border-green-700/50"
         >
           {procesando ? (
             "Procesando..."
