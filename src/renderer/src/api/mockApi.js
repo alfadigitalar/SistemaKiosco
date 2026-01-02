@@ -87,14 +87,18 @@ const mockCustomers = [
   {
     id: 1,
     name: "Cliente Consumidor Final",
-    document: "00000000",
+    dni: "00000000",
+    phone: "111-2222",
     address: "Venta al paso",
+    current_debt: 0,
   },
   {
     id: 2,
     name: "Juan Pérez",
-    document: "20123456789",
+    dni: "20123456789",
+    phone: "333-4444",
     address: "Calle Falsa 123",
+    current_debt: 1500,
   },
 ];
 
@@ -287,7 +291,25 @@ export const mockApi = {
   }),
   getSalesHistory: async () => [],
   getSaleDetails: async () => null,
-  getAdvancedReport: async () => [],
+  getAdvancedReport: async ({ startDate, endDate }) => {
+    return {
+      summary: {
+        totalSales: 150000,
+        estimatedProfit: 50000,
+        totalTransactions: 120,
+        averageTicket: 1250,
+      },
+      topProducts: [
+        { name: "Coca Cola 500ml", quantity: 50, total: 75000 },
+        { name: "Papas Lays Clásicas", quantity: 30, total: 36000 },
+        { name: "Alfajor Jorgito", quantity: 40, total: 32000 },
+      ],
+      salesByDay: [
+        { date: startDate || "2024-01-01", total: 50000 },
+        { date: endDate || "2024-01-30", total: 100000 },
+      ],
+    };
+  },
   getAllActivePromos: async () => [],
 
   // ═══════════════════════════════════════════════════════════
