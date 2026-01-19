@@ -14,6 +14,7 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
+    icon: path.join(__dirname, "../renderer/public/favicon.png"), // Icono de la ventana
     backgroundColor: "#0f172a", // Evita el flash blanco al cargar
     webPreferences: {
       // Ruta al script de preload (puente de comunicación)

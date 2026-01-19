@@ -54,13 +54,18 @@ const StockDetailModal = ({ isOpen, onClose, product, onUpdate }) => {
 
       // If we have API
       if (window.api) {
+        // Obtener user_id del localStorage
+        const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+        const userId = currentUser.id || 1; // Fallback a 1 si no hay usuario
+
         await window.api.addStockMovement({
           product_id: product.id,
-          quantity: qty,
+          quantity: Math.abs(adjustment), // Siempre positivo, el tipo indica la dirección
           reason:
             reason ||
             (adjustmentType === "add" ? "Ingreso Manual" : "Ajuste Stock"),
-          type: adjustmentType === "add" ? "IN" : "OUT",
+          type: adjustmentType === "add" ? "adjustment_add" : "adjustment_sub",
+          user_id: userId,
         });
         toast.success("Stock actualizado");
         if (onUpdate) onUpdate(); // Refresh parent
@@ -173,8 +178,8 @@ const StockDetailModal = ({ isOpen, onClose, product, onUpdate }) => {
                   {loading
                     ? "Guardando..."
                     : adjustmentType === "add"
-                    ? "Agregar Stock"
-                    : "Descontar Stock"}
+                      ? "Agregar Stock"
+                      : "Descontar Stock"}
                 </button>
               </form>
             </div>
@@ -198,12 +203,24 @@ const StockDetailModal = ({ isOpen, onClose, product, onUpdate }) => {
                       <div>
                         <p
                           className={`font-bold ${
-                            mov.type === "IN"
+                            [
+                              "adjustment_add",
+                              "purchase",
+                              "return",
+                              "IN",
+                            ].includes(mov.type)
                               ? "text-green-600"
                               : "text-red-600"
                           }`}
                         >
-                          {mov.type === "IN" ? "+" : "-"}
+                          {[
+                            "adjustment_add",
+                            "purchase",
+                            "return",
+                            "IN",
+                          ].includes(mov.type)
+                            ? "+"
+                            : "-"}
                           {Math.abs(mov.quantity)}
                         </p>
                         <p className="text-xs text-slate-500">

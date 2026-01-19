@@ -13,6 +13,7 @@ import { toast } from "react-hot-toast";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useConfig } from "../context/ConfigContext";
+import ConfirmationModal from "../components/ConfirmationModal";
 
 const ProveedoresScreen = () => {
   const { kioskAddress, kioskName } = useConfig();
@@ -37,6 +38,10 @@ const ProveedoresScreen = () => {
   const [orderSupplier, setOrderSupplier] = useState(null);
   const [orderItems, setOrderItems] = useState([]); // { product, quantity }
   const [productSearch, setProductSearch] = useState("");
+
+  // Delete Confirmation Modal
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [supplierToDelete, setSupplierToDelete] = useState(null);
 
   const fetchSuppliers = async () => {
     setLoading(true);
@@ -103,10 +108,22 @@ const ProveedoresScreen = () => {
     }
   };
 
-  const handleDeleteSupplier = async (id) => {
-    if (window.confirm("¿Eliminar proveedor?")) {
-      await window.api.deleteSupplier(id);
+  const handleDeleteSupplier = (supplier) => {
+    setSupplierToDelete(supplier);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmarEliminacion = async () => {
+    if (!supplierToDelete) return;
+    try {
+      await window.api.deleteSupplier(supplierToDelete.id);
+      toast.success("Proveedor eliminado");
       fetchSuppliers();
+    } catch (error) {
+      toast.error("Error al eliminar");
+    } finally {
+      setDeleteModalOpen(false);
+      setSupplierToDelete(null);
     }
   };
 
@@ -123,7 +140,7 @@ const ProveedoresScreen = () => {
     const lowStockItems = products
       .filter((p) => {
         console.log(
-          `Checking ${p.name}: stock=${p.stock_quantity}, min=${p.min_stock}, supp=${p.supplier_id}, target=${orderSupplier.id}`
+          `Checking ${p.name}: stock=${p.stock_quantity}, min=${p.min_stock}, supp=${p.supplier_id}, target=${orderSupplier.id}`,
         );
         return (
           p.stock_quantity <= p.min_stock && p.supplier_id == orderSupplier.id
@@ -226,7 +243,7 @@ const ProveedoresScreen = () => {
       doc.save(
         `Pedido_${orderSupplier.name}_${
           new Date().toISOString().split("T")[0]
-        }.pdf`
+        }.pdf`,
       );
       console.log("Guardado solicitado.");
       toast.success("PDF descargado correctamente");
@@ -237,7 +254,7 @@ const ProveedoresScreen = () => {
   };
 
   const filteredSuppliers = suppliers.filter((s) =>
-    s.name.toLowerCase().includes(search.toLowerCase())
+    s.name.toLowerCase().includes(search.toLowerCase()),
   );
 
   const filteredProducts = products
@@ -250,7 +267,7 @@ const ProveedoresScreen = () => {
         // Vamos a priorizar: si busco, busco en todos, pero visualmente marco los del proveedor?
         // O mejor: Filtro estricto por ahora para facilitar "el pedido del proveedor"
         // Si no tiene proveedor asignado, ¿lo mostramos? Asumamos filtro estricto por proveedor.
-        p.supplier_id === orderSupplier?.id
+        p.supplier_id === orderSupplier?.id,
     )
     .slice(0, 5); // Solo mostrar 5 sugerencias
 
@@ -313,7 +330,7 @@ const ProveedoresScreen = () => {
                   <Edit size={18} />
                 </button>
                 <button
-                  onClick={() => handleDeleteSupplier(supplier.id)}
+                  onClick={() => handleDeleteSupplier(supplier)}
                   className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-red-600 dark:text-red-400 transition"
                 >
                   <Trash2 size={18} />
@@ -589,6 +606,21 @@ const ProveedoresScreen = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setSupplierToDelete(null);
+        }}
+        onConfirm={confirmarEliminacion}
+        title="Eliminar Proveedor"
+        message={`¿Estás seguro de que deseas eliminar "${supplierToDelete?.name || "este proveedor"}"? Esta acción no se puede deshacer.`}
+        confirmText="Sí, Eliminar"
+        cancelText="Cancelar"
+        isDestructive={true}
+      />
     </div>
   );
 };

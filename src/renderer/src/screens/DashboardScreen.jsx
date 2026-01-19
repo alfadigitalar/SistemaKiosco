@@ -280,7 +280,7 @@ const DashboardScreen = () => {
 
             {stats?.salesChartData?.map((item) => {
               const maxVal = Math.max(
-                ...stats.salesChartData.map((d) => d.total)
+                ...stats.salesChartData.map((d) => d.total),
               );
               const height = maxVal > 0 ? (item.total / maxVal) * 100 : 0;
               return (
@@ -297,10 +297,19 @@ const DashboardScreen = () => {
                     </div>
                   </div>
                   <span className="text-[10px] text-slate-500 dark:text-slate-400 text-center font-medium">
-                    {new Date(item.date).toLocaleDateString("es-ES", {
-                      weekday: "short",
-                      day: "numeric",
-                    })}
+                    {(() => {
+                      // Parsear fecha manualmente para evitar problemas de UTC
+                      const [y, m, d] = item.date.split("-");
+                      const localDate = new Date(
+                        parseInt(y),
+                        parseInt(m) - 1,
+                        parseInt(d),
+                      );
+                      return localDate.toLocaleDateString("es-ES", {
+                        weekday: "short",
+                        day: "numeric",
+                      });
+                    })()}
                   </span>
                 </div>
               );
@@ -331,14 +340,14 @@ const DashboardScreen = () => {
                 >
                   <div className="flex items-center gap-3 overflow-hidden">
                     <div
-                      className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                      className={`flex items-center justify-center w-7 h-7 min-w-[28px] flex-shrink-0 rounded-full text-xs font-bold ${
                         index === 0
-                          ? "bg-yellow-100 text-yellow-700"
+                          ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-400"
                           : index === 1
-                          ? "bg-slate-200 text-slate-700"
-                          : index === 2
-                          ? "bg-orange-100 text-orange-800"
-                          : "bg-slate-100 text-slate-500"
+                            ? "bg-slate-200 text-slate-700 dark:bg-slate-600 dark:text-slate-200"
+                            : index === 2
+                              ? "bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-400"
+                              : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400"
                       }`}
                     >
                       {index + 1}

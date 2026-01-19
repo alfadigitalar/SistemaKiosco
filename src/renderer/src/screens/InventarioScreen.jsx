@@ -13,6 +13,7 @@ import {
 import { toast } from "react-hot-toast";
 import StockDetailModal from "../components/StockDetailModal";
 import DemoModal from "../components/DemoModal";
+import ConfirmationModal from "../components/ConfirmationModal";
 
 const InventarioScreen = () => {
   const [products, setProducts] = useState([]);
@@ -31,6 +32,10 @@ const InventarioScreen = () => {
 
   // Demo Modal
   const [demoModalOpen, setDemoModalOpen] = useState(false);
+
+  // Delete Confirmation Modal
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -155,7 +160,7 @@ const InventarioScreen = () => {
                 qty: i.quantity,
                 stock_quantity: currentProd ? currentProd.stock_quantity : 0, // Necesario para cálculo
               };
-            })
+            }),
           );
         });
       } else {
@@ -240,19 +245,26 @@ const InventarioScreen = () => {
     }
   };
 
-  const handleDeleteProduct = async (id) => {
-    if (window.confirm("¿Seguro que deseas eliminar este producto?")) {
-      try {
-        await window.api.deleteProduct(id);
-        toast.success("Producto eliminado");
-        fetchProducts();
-      } catch (error) {
-        if (error.message === "DEMO_RESTRICTED") {
-          setDemoModalOpen(true);
-          return;
-        }
-        toast.error("Error al eliminar");
+  const handleDeleteProduct = (product) => {
+    setProductToDelete(product);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmarEliminacion = async () => {
+    if (!productToDelete) return;
+    try {
+      await window.api.deleteProduct(productToDelete.id);
+      toast.success("Producto eliminado");
+      fetchProducts();
+    } catch (error) {
+      if (error.message === "DEMO_RESTRICTED") {
+        setDemoModalOpen(true);
+        return;
       }
+      toast.error("Error al eliminar");
+    } finally {
+      setDeleteModalOpen(false);
+      setProductToDelete(null);
     }
   };
 
@@ -260,7 +272,7 @@ const InventarioScreen = () => {
     (p) =>
       (activeTab === "products" ? !p.is_promo : p.is_promo) &&
       (p.name.toLowerCase().includes(search.toLowerCase()) ||
-        (p.barcode && p.barcode.includes(search)))
+        (p.barcode && p.barcode.includes(search))),
   );
 
   // Filter for adding components (only standard products, not other promos to avoid cycles for now)
@@ -269,7 +281,7 @@ const InventarioScreen = () => {
       (p) =>
         !p.is_promo &&
         (p.name.toLowerCase().includes(promoSearch.toLowerCase()) ||
-          (p.barcode && p.barcode.includes(promoSearch)))
+          (p.barcode && p.barcode.includes(promoSearch))),
     )
     .slice(0, 5);
 
@@ -286,8 +298,8 @@ const InventarioScreen = () => {
   const updateComponentQty = (id, qty) => {
     setSelectedComponents(
       selectedComponents.map((c) =>
-        c.id === id ? { ...c, qty: parseFloat(qty) || 0 } : c
-      )
+        c.id === id ? { ...c, qty: parseFloat(qty) || 0 } : c,
+      ),
     );
   };
 
@@ -470,7 +482,7 @@ const InventarioScreen = () => {
                     </button>
                     <button
                       title="Eliminar"
-                      onClick={() => handleDeleteProduct(product.id)}
+                      onClick={() => handleDeleteProduct(product)}
                       className="p-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
                     >
                       <Trash2 size={18} />
@@ -499,8 +511,8 @@ const InventarioScreen = () => {
                     ? "Editar Promo"
                     : "Editar Producto"
                   : formData.is_promo
-                  ? "Nueva Promo"
-                  : "Nuevo Producto"}
+                    ? "Nueva Promo"
+                    : "Nuevo Producto"}
               </h2>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -776,7 +788,7 @@ const InventarioScreen = () => {
                           .reduce(
                             (acc, c) =>
                               acc + (c.cost_price || 0) * (c.qty || 1),
-                            0
+                            0,
                           )
                           .toFixed(2)}
                       </div>
@@ -855,7 +867,7 @@ const InventarioScreen = () => {
         isOpen={stockModalOpen}
         onClose={() => setStockModalOpen(false)}
         product={selectedProductForStock}
-        onStockUpdate={() => {
+        onUpdate={() => {
           fetchProducts(); // Recargar tabla principal para ver stock actualizado
         }}
       />
@@ -864,6 +876,20 @@ const InventarioScreen = () => {
         isOpen={demoModalOpen}
         onClose={() => setDemoModalOpen(false)}
         actionName="modificar el inventario"
+      />
+
+      <ConfirmationModal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setProductToDelete(null);
+        }}
+        onConfirm={confirmarEliminacion}
+        title="Eliminar Producto"
+        message={`¿Estás seguro de que deseas eliminar "${productToDelete?.name || "este producto"}"? Esta acción no se puede deshacer.`}
+        confirmText="Sí, Eliminar"
+        cancelText="Cancelar"
+        isDestructive={true}
       />
     </div>
   );

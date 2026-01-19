@@ -144,7 +144,7 @@ function registerIpcHandlers() {
           supplier_id,
           measurement_unit || "un",
           is_promo ? 1 : 0,
-        ]
+        ],
       );
 
       const newProductId = result.lastId;
@@ -154,7 +154,7 @@ function registerIpcHandlers() {
         for (const item of promo_items) {
           await run(
             "INSERT INTO promo_items (promo_id, product_id, quantity) VALUES (?, ?, ?)",
-            [newProductId, item.product_id, item.quantity]
+            [newProductId, item.product_id, item.quantity],
           );
         }
       }
@@ -205,7 +205,7 @@ function registerIpcHandlers() {
           measurement_unit || "un",
           is_promo ? 1 : 0, // is_promo no estaba en el update, agregarlo
           id,
-        ]
+        ],
       );
 
       // Si es promo, actualizar items (Borrar y Reinsertar es lo más fácil)
@@ -218,7 +218,7 @@ function registerIpcHandlers() {
           for (const item of promo_items) {
             await run(
               "INSERT INTO promo_items (promo_id, product_id, quantity) VALUES (?, ?, ?)",
-              [id, item.product_id, item.quantity]
+              [id, item.product_id, item.quantity],
             );
           }
         }
@@ -256,7 +256,7 @@ function registerIpcHandlers() {
               JOIN products p ON pi.product_id = p.id
               WHERE pi.promo_id = ?
           `,
-        [promoId]
+        [promoId],
       );
       return items;
     } catch (error) {
@@ -270,7 +270,7 @@ function registerIpcHandlers() {
     try {
       // 1. Obtener productos que son promos activos
       const promos = await all(
-        "SELECT * FROM products WHERE is_promo = 1 AND is_active = 1"
+        "SELECT * FROM products WHERE is_promo = 1 AND is_active = 1",
       );
 
       // 2. Para cada promo, obtener sus items
@@ -281,10 +281,10 @@ function registerIpcHandlers() {
              FROM promo_items pi
              JOIN products p ON pi.product_id = p.id
              WHERE pi.promo_id = ?`,
-            [promo.id]
+            [promo.id],
           );
           return { ...promo, items: promoItems };
-        })
+        }),
       );
 
       return promosWithItems;
@@ -339,7 +339,7 @@ function registerIpcHandlers() {
       const insertResult = await run(
         `INSERT INTO sales (user_id, client_id, total_amount, payment_method, timestamp)
          VALUES (?, ?, ?, ?, ?)`,
-        [userId || 1, clientId || null, total, paymentMethod, localTimestamp]
+        [userId || 1, clientId || null, total, paymentMethod, localTimestamp],
       );
 
       // Obtener el ID de la venta recién creada
@@ -361,27 +361,27 @@ function registerIpcHandlers() {
             item.cantidad,
             item.sale_price,
             item.cantidad * item.sale_price,
-          ]
+          ],
         );
 
         // Descontar stock del producto (Manejo de Promos)
         // Verificar si es promo
         const productInfo = await get(
           "SELECT is_promo FROM products WHERE id = ?",
-          [item.id]
+          [item.id],
         );
 
         if (productInfo && productInfo.is_promo === 1) {
           // Es promo: Descontar stock de sus componentes
           const components = await all(
             "SELECT product_id, quantity FROM promo_items WHERE promo_id = ?",
-            [item.id]
+            [item.id],
           );
           for (const comp of components) {
             // Cantidad a descontar = (qtyComponente * qtyVenta)
             await run(
               "UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?",
-              [comp.quantity * item.cantidad, comp.product_id]
+              [comp.quantity * item.cantidad, comp.product_id],
             );
             // Opcional: Registrar movimiento de stock para cada componente (si tuviéramos tabla detallada)
           }
@@ -389,7 +389,7 @@ function registerIpcHandlers() {
           // Es producto normal
           await run(
             `UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?`,
-            [item.cantidad, item.id]
+            [item.cantidad, item.id],
           );
         }
       }
@@ -398,7 +398,7 @@ function registerIpcHandlers() {
       if (paymentMethod === "checking_account" && clientId) {
         await run(
           "UPDATE clients SET current_debt = current_debt + ? WHERE id = ?",
-          [total, clientId]
+          [total, clientId],
         );
       }
 
@@ -418,7 +418,7 @@ function registerIpcHandlers() {
   ipcMain.handle("get-customers", async () => {
     try {
       const rows = await all(
-        "SELECT * FROM clients WHERE is_active = 1 ORDER BY name ASC"
+        "SELECT * FROM clients WHERE is_active = 1 ORDER BY name ASC",
       );
       return rows;
     } catch (error) {
@@ -436,7 +436,7 @@ function registerIpcHandlers() {
 
       await run(
         "INSERT INTO clients (name, dni, phone, current_debt) VALUES (?, ?, ?, ?)",
-        [name, safeDni, phone, current_debt || 0]
+        [name, safeDni, phone, current_debt || 0],
       );
       return { success: true };
     } catch (error) {
@@ -456,7 +456,7 @@ function registerIpcHandlers() {
 
       await run(
         "UPDATE clients SET name = ?, dni = ?, phone = ?, current_debt = ? WHERE id = ?",
-        [name, safeDni, phone, current_debt, id]
+        [name, safeDni, phone, current_debt, id],
       );
       return { success: true };
     } catch (error) {
@@ -487,13 +487,13 @@ function registerIpcHandlers() {
         // 1. Descontar deuda del cliente
         await run(
           "UPDATE clients SET current_debt = current_debt - ? WHERE id = ?",
-          [amount, clientId]
+          [amount, clientId],
         );
 
         // 2. Registrar movimiento en caja
         await run(
           "INSERT INTO movements (type, amount, description, user_id) VALUES (?, ?, ?, ?)",
-          ["entry", amount, `Pago de deuda cliente #${clientId}`, userId || 1]
+          ["entry", amount, `Pago de deuda cliente #${clientId}`, userId || 1],
         );
 
         return { success: true };
@@ -501,7 +501,7 @@ function registerIpcHandlers() {
         console.error("Error al procesar pago de deuda:", error);
         return { success: false, message: error.message };
       }
-    }
+    },
   );
 
   // ═══════════════════════════════════════════════════════════
@@ -512,7 +512,7 @@ function registerIpcHandlers() {
   ipcMain.handle("get-current-session", async () => {
     try {
       const session = await get(
-        "SELECT * FROM cash_sessions WHERE closed_at IS NULL ORDER BY id DESC LIMIT 1"
+        "SELECT * FROM cash_sessions WHERE closed_at IS NULL ORDER BY id DESC LIMIT 1",
       );
       return session;
     } catch (error) {
@@ -528,7 +528,7 @@ function registerIpcHandlers() {
       try {
         // Verificar si ya hay una abierta
         const existing = await get(
-          "SELECT id FROM cash_sessions WHERE closed_at IS NULL"
+          "SELECT id FROM cash_sessions WHERE closed_at IS NULL",
         );
         if (existing) {
           return { success: false, message: "Ya hay una caja abierta." };
@@ -536,14 +536,14 @@ function registerIpcHandlers() {
 
         await run(
           "INSERT INTO cash_sessions (user_id, initial_amount) VALUES (?, ?)",
-          [userId, initialAmount]
+          [userId, initialAmount],
         );
         return { success: true };
       } catch (error) {
         console.error("Error al abrir caja:", error);
         return { success: false, message: error.message };
       }
-    }
+    },
   );
 
   // Cerrar Caja
@@ -551,7 +551,7 @@ function registerIpcHandlers() {
     "close-cash-session",
     async (
       event,
-      { sessionId, finalAmount, totalSales, totalMovements, realAmount }
+      { sessionId, finalAmount, totalSales, totalMovements, realAmount },
     ) => {
       try {
         const difference =
@@ -568,14 +568,14 @@ function registerIpcHandlers() {
             realAmount !== undefined ? realAmount : null,
             difference,
             sessionId,
-          ]
+          ],
         );
         return { success: true };
       } catch (error) {
         console.error("Error al cerrar caja:", error);
         return { success: false, message: error.message };
       }
-    }
+    },
   );
 
   // Obtener Resumen de Caja (Ventas, Movimientos, Deudoas)
@@ -584,7 +584,7 @@ function registerIpcHandlers() {
       // 1. Obtener fecha de inicio de la sesión
       const session = await get(
         "SELECT opened_at, initial_amount FROM cash_sessions WHERE id = ?",
-        [sessionId]
+        [sessionId],
       );
       if (!session) throw new Error("Sesión no encontrada");
 
@@ -596,14 +596,14 @@ function registerIpcHandlers() {
         `SELECT SUM(total_amount) as total 
          FROM sales 
          WHERE timestamp >= ? AND payment_method = 'efectivo'`, // Ajustar 'efectivo' según como lo guardes en POS
-        [startDate]
+        [startDate],
       );
       const totalSalesCash = salesResult.total || 0;
 
       // 3. Sumar Movimientos (Entradas y Salidas)
       const movementsResult = await all(
         "SELECT type, SUM(amount) as total FROM movements WHERE timestamp >= ? GROUP BY type",
-        [startDate]
+        [startDate],
       );
 
       let totalIn = 0;
@@ -640,7 +640,7 @@ function registerIpcHandlers() {
       if (type === "withdrawal") {
         // 1. Obtener Sesión Actual
         const session = await get(
-          "SELECT * FROM cash_sessions WHERE closed_at IS NULL ORDER BY id DESC LIMIT 1"
+          "SELECT * FROM cash_sessions WHERE closed_at IS NULL ORDER BY id DESC LIMIT 1",
         );
 
         if (!session) throw new Error("No hay caja abierta.");
@@ -651,14 +651,14 @@ function registerIpcHandlers() {
         // Ventas Efectivo
         const salesResult = await get(
           "SELECT SUM(total_amount) as total FROM sales WHERE timestamp >= ? AND payment_method = 'efectivo'",
-          [startDate]
+          [startDate],
         );
         const totalSales = salesResult.total || 0;
 
         // Movimientos Previos
         const movementsResult = await all(
           "SELECT type, SUM(amount) as total FROM movements WHERE timestamp >= ? GROUP BY type",
-          [startDate]
+          [startDate],
         );
 
         let totalIn = 0;
@@ -682,7 +682,7 @@ function registerIpcHandlers() {
 
       await run(
         "INSERT INTO movements (type, amount, description, user_id) VALUES (?, ?, ?, ?)",
-        [type, amount, description, userId]
+        [type, amount, description, userId],
       );
       return { success: true };
     } catch (error) {
@@ -696,7 +696,7 @@ function registerIpcHandlers() {
     try {
       const rows = await all(
         "SELECT * FROM movements ORDER BY id DESC LIMIT ?",
-        [limit]
+        [limit],
       );
       return rows;
     } catch (error) {
@@ -710,29 +710,28 @@ function registerIpcHandlers() {
 
   ipcMain.handle("get-dashboard-stats", async () => {
     try {
-      const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-      const firstDayOfMonth = new Date(
-        new Date().getFullYear(),
-        new Date().getMonth(),
-        1
-      )
-        .toISOString()
-        .split("T")[0];
+      // Calcular fechas en hora local usando JavaScript
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-      // 1. Ventas de Hoy
+      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const firstDayOfMonth = `${firstOfMonth.getFullYear()}-${String(firstOfMonth.getMonth() + 1).padStart(2, "0")}-${String(firstOfMonth.getDate()).padStart(2, "0")}`;
+
+      // 1. Ventas de Hoy - usando substr para comparar con fecha local
       const salesToday = await get(
-        "SELECT SUM(total_amount) as total FROM sales WHERE date(timestamp) = date('now', 'localtime')"
+        "SELECT SUM(total_amount) as total FROM sales WHERE substr(timestamp, 1, 10) = ?",
+        [todayStr],
       );
 
-      // 2. Ventas del Mes
+      // 2. Ventas del Mes - usando substr para comparar con fecha local
       const salesMonth = await get(
-        "SELECT SUM(total_amount) as total FROM sales WHERE date(timestamp) >= ?",
-        [firstDayOfMonth]
+        "SELECT SUM(total_amount) as total FROM sales WHERE substr(timestamp, 1, 10) >= ?",
+        [firstDayOfMonth],
       );
 
       // 3. Productos con Stock Bajo
       const lowStock = await get(
-        "SELECT COUNT(*) as count FROM products WHERE stock_quantity <= min_stock AND is_active = 1 AND (is_promo = 0 OR is_promo IS NULL)"
+        "SELECT COUNT(*) as count FROM products WHERE stock_quantity <= min_stock AND is_active = 1 AND (is_promo = 0 OR is_promo IS NULL)",
       );
 
       // 4. Últimas 5 ventas
@@ -740,7 +739,7 @@ function registerIpcHandlers() {
         `SELECT s.id, s.timestamp, s.total_amount, u.name as user_name 
          FROM sales s 
          LEFT JOIN users u ON s.user_id = u.id 
-         ORDER BY s.id DESC LIMIT 5`
+         ORDER BY s.id DESC LIMIT 5`,
       );
 
       // 5. Top 5 Productos más vendidos (Histórico)
@@ -750,16 +749,23 @@ function registerIpcHandlers() {
          JOIN products p ON si.product_id = p.id
          GROUP BY si.product_id
          ORDER BY total_qty DESC
-         LIMIT 5`
+         LIMIT 5`,
       );
 
       // 6. Ventas últimos 7 días (para gráfico)
+      // Usamos substr para extraer la fecha directamente del timestamp guardado en formato local
+      // Esto evita problemas de conversión a UTC que tiene la función date()
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+      const sevenDaysAgoStr = `${sevenDaysAgo.getFullYear()}-${String(sevenDaysAgo.getMonth() + 1).padStart(2, "0")}-${String(sevenDaysAgo.getDate()).padStart(2, "0")}`;
+
       const salesLast7Days = await all(
-        `SELECT date(timestamp) as date, SUM(total_amount) as total
+        `SELECT substr(timestamp, 1, 10) as date, SUM(total_amount) as total
          FROM sales
-         WHERE date(timestamp) >= date('now', '-6 days')
-         GROUP BY date(timestamp)
-         ORDER BY date(timestamp) ASC`
+         WHERE substr(timestamp, 1, 10) >= ?
+         GROUP BY substr(timestamp, 1, 10)
+         ORDER BY substr(timestamp, 1, 10) ASC`,
+        [sevenDaysAgoStr],
       );
 
       return {
@@ -815,14 +821,16 @@ function registerIpcHandlers() {
         const summary = await get(summaryQuery, [start, end]);
 
         // 2. Ventas por Día (Para el Gráfico)
+        // Usamos substr para extraer la fecha directamente del timestamp guardado en formato local
+        // Esto evita problemas de conversión a UTC que tiene la función date()
         const salesByDayQuery = `
          SELECT 
-           date(timestamp) as date,
+           substr(timestamp, 1, 10) as date,
            SUM(total_amount) as total
          FROM sales
          WHERE timestamp >= ? AND timestamp <= ?
-         GROUP BY date(timestamp)
-         ORDER BY date(timestamp) ASC
+         GROUP BY substr(timestamp, 1, 10)
+         ORDER BY substr(timestamp, 1, 10) ASC
        `;
         const salesByDay = await all(salesByDayQuery, [start, end]);
 
@@ -856,7 +864,7 @@ function registerIpcHandlers() {
         console.error("Error en reporte avanzado:", error);
         return { error: error.message };
       }
-    }
+    },
   );
 
   // ═══════════════════════════════════════════════════════════
@@ -872,7 +880,7 @@ function registerIpcHandlers() {
       // 1. Registrar devolución
       const result = await run(
         "INSERT INTO returns (sale_id, total_refund, reason, user_id) VALUES (?, ?, ?, ?)",
-        [saleId, totalRefund, reason || "Devolución", userId]
+        [saleId, totalRefund, reason || "Devolución", userId],
       );
       // 'run' en db.js devuelve Changes info, pero necesitamos el ID.
       // sql.js devuelve el lastInsertId en el result object si modificamos db.js,
@@ -897,13 +905,13 @@ function registerIpcHandlers() {
             item.quantity,
             item.price,
             item.quantity * item.price,
-          ]
+          ],
         );
 
         // b. Devolver Stock
         await run(
           "UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?",
-          [item.quantity, item.productId]
+          [item.quantity, item.productId],
         );
 
         // c. Registrar Movimiento de Stock
@@ -914,7 +922,7 @@ function registerIpcHandlers() {
             item.quantity,
             `Devolución Ticket #${saleId}`,
             userId,
-          ]
+          ],
         );
       }
 
@@ -923,7 +931,7 @@ function registerIpcHandlers() {
       if (totalRefund > 0) {
         await run(
           "INSERT INTO movements (type, amount, description, user_id) VALUES ('withdrawal', ?, ?, ?)",
-          [totalRefund, `Reembolso Devolución Ticket #${saleId}`, userId]
+          [totalRefund, `Reembolso Devolución Ticket #${saleId}`, userId],
         );
       }
 
@@ -1021,7 +1029,7 @@ function registerIpcHandlers() {
             LEFT JOIN products p ON si.product_id = p.id
             WHERE si.sale_id = ?
           `,
-        [saleId]
+        [saleId],
       );
       return items;
     } catch (error) {
@@ -1038,7 +1046,7 @@ function registerIpcHandlers() {
   ipcMain.handle("get-suppliers", async () => {
     try {
       const rows = await all(
-        "SELECT * FROM suppliers WHERE is_active = 1 ORDER BY name ASC"
+        "SELECT * FROM suppliers WHERE is_active = 1 ORDER BY name ASC",
       );
       return rows;
     } catch (error) {
@@ -1053,7 +1061,7 @@ function registerIpcHandlers() {
       const { name, contact_name, phone, email, notes } = supplier;
       await run(
         "INSERT INTO suppliers (name, contact_name, phone, email, notes) VALUES (?, ?, ?, ?, ?)",
-        [name, contact_name, phone, email, notes]
+        [name, contact_name, phone, email, notes],
       );
       return { success: true };
     } catch (error) {
@@ -1068,7 +1076,7 @@ function registerIpcHandlers() {
       const { id, name, contact_name, phone, email, notes } = supplier;
       await run(
         "UPDATE suppliers SET name=?, contact_name=?, phone=?, email=?, notes=? WHERE id=?",
-        [name, contact_name, phone, email, notes, id]
+        [name, contact_name, phone, email, notes, id],
       );
       return { success: true };
     } catch (error) {
@@ -1120,7 +1128,7 @@ function registerIpcHandlers() {
         // Usaremos REPLACE INTO o INSERT OR REPLACE
         await run(
           "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-          [key, value]
+          [key, value],
         );
       }
       return { success: true };
@@ -1138,7 +1146,7 @@ function registerIpcHandlers() {
   ipcMain.handle("login-user", async (event, { username, password }) => {
     try {
       console.log(
-        `[LOGIN DEBUG] Intentando login con usuario: '${username}' y contraseña: '${password}'`
+        `[LOGIN DEBUG] Intentando login con usuario: '${username}' y contraseña: '${password}'`,
       );
 
       // 1. Buscar usuario por nombre de usuario solamente
@@ -1148,24 +1156,24 @@ function registerIpcHandlers() {
 
       if (!user) {
         console.log(
-          `[LOGIN DEBUG] ❌ Usuario '${username}' NO encontrado en la base de datos.`
+          `[LOGIN DEBUG] ❌ Usuario '${username}' NO encontrado en la base de datos.`,
         );
 
         // DEBUG: Mostrar qué usuarios SÍ existen para comparar
         const allUsers = await all("SELECT id, username FROM users");
         console.log(
           "[LOGIN DEBUG] Usuarios disponibles en DB:",
-          allUsers.map((u) => `"${u.username}"`)
+          allUsers.map((u) => `"${u.username}"`),
         );
 
         return { success: false, message: "Usuario no encontrado" };
       }
 
       console.log(
-        `[LOGIN DEBUG] ✅ Usuario encontrado: ID=${user.id}, Nombre='${user.name}', Role='${user.role}'`
+        `[LOGIN DEBUG] ✅ Usuario encontrado: ID=${user.id}, Nombre='${user.name}', Role='${user.role}'`,
       );
       console.log(
-        `[LOGIN DEBUG] Contraseña almacenada en DB: '${user.password_hash}'`
+        `[LOGIN DEBUG] Contraseña almacenada en DB: '${user.password_hash}'`,
       );
 
       // 2. Verificar contraseña (comparación directa de texto)
@@ -1187,7 +1195,7 @@ function registerIpcHandlers() {
         };
       } else {
         console.log(
-          `[LOGIN DEBUG] ❌ Contraseña INCORRECTA. La DB espera '${user.password_hash}' pero recibió '${password}'`
+          `[LOGIN DEBUG] ❌ Contraseña INCORRECTA. La DB espera '${user.password_hash}' pero recibió '${password}'`,
         );
         return { success: false, message: "Contraseña incorrecta" };
       }
@@ -1207,7 +1215,7 @@ function registerIpcHandlers() {
       // Ocultamos el hash en la lista (opcional, pero buena práctica)
       // Aunque para editar a veces se necesita saber si tiene pass.
       const rows = await all(
-        "SELECT id, name, username, role, active FROM users WHERE active = 1 ORDER BY name ASC"
+        "SELECT id, name, username, role, active FROM users WHERE active = 1 ORDER BY name ASC",
       );
       return rows;
     } catch (error) {
@@ -1224,7 +1232,7 @@ function registerIpcHandlers() {
       // Por ahora texto plano como el resto del sistema.
       await run(
         "INSERT INTO users (name, username, password_hash, role, active) VALUES (?, ?, ?, ?, 1)",
-        [name, username, password, role || "employee"]
+        [name, username, password, role || "employee"],
       );
       return { success: true };
     } catch (error) {
@@ -1330,7 +1338,7 @@ function registerIpcHandlers() {
       // 1. Registrar Movimiento
       await run(
         "INSERT INTO stock_movements (product_id, type, quantity, reason, user_id) VALUES (?, ?, ?, ?, ?)",
-        [product_id, type, quantity, reason, user_id]
+        [product_id, type, quantity, reason, user_id],
       );
 
       // 2. Actualizar Stock del Producto
@@ -1343,7 +1351,7 @@ function registerIpcHandlers() {
 
       await run(
         `UPDATE products SET stock_quantity = stock_quantity ${operator} ? WHERE id = ?`,
-        [quantity, product_id]
+        [quantity, product_id],
       );
 
       return { success: true };
@@ -1362,7 +1370,7 @@ function registerIpcHandlers() {
          LEFT JOIN users u ON sm.user_id = u.id
          WHERE sm.product_id = ?
          ORDER BY sm.timestamp DESC`,
-        [productId]
+        [productId],
       );
       return rows;
     } catch (error) {
@@ -1406,7 +1414,7 @@ function registerIpcHandlers() {
               if (val.search(/("|,|\n)/g) >= 0) val = `"${val}"`; // Quote if needed
               return val;
             })
-            .join(",")
+            .join(","),
         );
         return [headerRow, ...values].join("\n");
       };
@@ -1415,14 +1423,14 @@ function registerIpcHandlers() {
       const products = await all("SELECT * FROM products");
       fs.writeFileSync(
         path.join(destFolder, "productos_novy.csv"),
-        toCSV(products)
+        toCSV(products),
       );
 
       // 4. Fetch & Write Clients
       const clients = await all("SELECT * FROM clients");
       fs.writeFileSync(
         path.join(destFolder, "clientes_novy.csv"),
-        toCSV(clients)
+        toCSV(clients),
       );
 
       // 5. Fetch & Write Sales
@@ -1457,7 +1465,7 @@ function registerIpcHandlers() {
       try {
         // 1. Obtener configuración
         const settingsRows = await all(
-          "SELECT key, value FROM settings WHERE key IN ('tax_enabled', 'tax_cuit', 'tax_sales_point', 'tax_cert_path', 'tax_key_path')"
+          "SELECT key, value FROM settings WHERE key IN ('tax_enabled', 'tax_cuit', 'tax_sales_point', 'tax_cert_path', 'tax_key_path')",
         );
         const config = {};
         settingsRows.forEach((row) => (config[row.key] = row.value));
@@ -1511,7 +1519,7 @@ function registerIpcHandlers() {
               result.cae,
               result.caeFchVto,
               saleId,
-            ]
+            ],
           );
         }
 
@@ -1520,7 +1528,7 @@ function registerIpcHandlers() {
         console.error("Error en create-electronic-invoice:", error);
         return { success: false, message: error.message };
       }
-    }
+    },
   );
 
   ipcMain.handle(
@@ -1529,7 +1537,7 @@ function registerIpcHandlers() {
       try {
         // 1. Obtener Configuración SMTP
         const settings = await all(
-          "SELECT * FROM settings WHERE key LIKE 'smtp_%'"
+          "SELECT * FROM settings WHERE key LIKE 'smtp_%'",
         );
         const config = {};
         settings.forEach((s) => (config[s.key] = s.value));
@@ -1571,7 +1579,7 @@ function registerIpcHandlers() {
         console.error("Error enviando email:", error);
         return { success: false, message: error.message };
       }
-    }
+    },
   );
 
   // ═══════════════════════════════════════════════════════════
@@ -1580,7 +1588,7 @@ function registerIpcHandlers() {
 
   const BACKUP_DIR = path.join(
     require("electron").app.getPath("userData"),
-    "backups"
+    "backups",
   );
   if (!fs.existsSync(BACKUP_DIR)) {
     fs.mkdirSync(BACKUP_DIR);

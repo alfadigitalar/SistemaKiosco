@@ -18,6 +18,7 @@ import CustomerSearch from "../components/CustomerSearch";
 import WeightModal from "../components/WeightModal";
 import jsPDF from "jspdf";
 import DemoModal from "../components/DemoModal";
+import ConfirmationModal from "../components/ConfirmationModal";
 
 /**
  * Pantalla Principal de Punto de Venta (POS)
@@ -60,6 +61,9 @@ export default function PosScreen() {
 
   // Demo Modal
   const [demoModalOpen, setDemoModalOpen] = useState(false);
+
+  // Modal Confirmación Cancelar Venta
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
 
   const inputRef = useRef(null);
   const navigate = useNavigate();
@@ -205,7 +209,7 @@ export default function PosScreen() {
         }
 
         const possibleTimes = Math.floor(
-          cartItem.cantidad / promoItem.quantity
+          cartItem.cantidad / promoItem.quantity,
         );
         if (possibleTimes < 1) {
           hasAllIngredients = false;
@@ -250,7 +254,7 @@ export default function PosScreen() {
               background: "#7E22CE", // purple-700
               color: "#fff",
             },
-          }
+          },
         );
       }
     });
@@ -267,7 +271,7 @@ export default function PosScreen() {
 
         // Encontramos el item en el carrito (debería existir por la validación anterior)
         const cartItemIndex = newCart.findIndex(
-          (c) => c.id === pItem.product_id
+          (c) => c.id === pItem.product_id,
         );
 
         if (cartItemIndex !== -1) {
@@ -294,7 +298,7 @@ export default function PosScreen() {
         newCart = newCart.map((p) =>
           p.id === promo.id
             ? { ...p, cantidad: parseFloat((p.cantidad + count).toFixed(3)) }
-            : p
+            : p,
         );
       } else {
         newCart.push({ ...promo, cantidad: count });
@@ -412,13 +416,13 @@ export default function PosScreen() {
     oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
     oscillator.frequency.exponentialRampToValueAtTime(
       440,
-      audioCtx.currentTime + 0.5
+      audioCtx.currentTime + 0.5,
     );
 
     gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(
       0.01,
-      audioCtx.currentTime + 0.5
+      audioCtx.currentTime + 0.5,
     );
 
     oscillator.start();
@@ -432,7 +436,7 @@ export default function PosScreen() {
   // Subtotal = suma de (precio × cantidad) de todos los items
   const subtotal = carrito.reduce(
     (acc, item) => acc + item.sale_price * item.cantidad,
-    0
+    0,
   );
 
   // Total = subtotal + impuestos (0% por ahora)
@@ -507,7 +511,7 @@ export default function PosScreen() {
     const existe = carrito.find((p) => p.id === producto.id);
     const cantidadActual = existe ? existe.cantidad : 0;
     const nuevaCantidad = parseFloat(
-      (cantidadActual + cantidadToAdd).toFixed(3)
+      (cantidadActual + cantidadToAdd).toFixed(3),
     );
 
     // Validación de Stock (Solo si NO es promo)
@@ -543,7 +547,7 @@ export default function PosScreen() {
             border: "1px solid #B91C1C",
           },
           duration: 4000,
-        }
+        },
       );
       playLowStockSound();
     }
@@ -554,7 +558,7 @@ export default function PosScreen() {
 
       if (currentExiste) {
         return prev.map((p) =>
-          p.id === producto.id ? { ...p, cantidad: nuevaCantidad } : p
+          p.id === producto.id ? { ...p, cantidad: nuevaCantidad } : p,
         );
       }
       return [...prev, { ...producto, cantidad: cantidadToAdd }];
@@ -574,10 +578,14 @@ export default function PosScreen() {
   // Cancelar venta completa
   const cancelarVenta = () => {
     if (carrito.length === 0) return;
-    if (window.confirm("¿Seguro que deseas cancelar la venta actual?")) {
-      setCarrito([]);
-      localStorage.removeItem("cart_backup");
-    }
+    setCancelModalOpen(true);
+  };
+
+  const confirmarCancelacion = () => {
+    setCarrito([]);
+    localStorage.removeItem("cart_backup");
+    setCancelModalOpen(false);
+    toast.success("Venta cancelada");
   };
 
   // Manejar el cambio en el input de búsqueda
@@ -621,7 +629,7 @@ export default function PosScreen() {
           return { ...prod, cantidad: nuevaCantidad };
         }
         return prod;
-      })
+      }),
     );
   };
 
@@ -746,7 +754,7 @@ export default function PosScreen() {
   // RENDER
   // ═══════════════════════════════════════════════════════════
   return (
-    <div className="flex flex-col lg:flex-row h-full gap-4 text-slate-900 dark:text-white overflow-hidden">
+    <div className="flex flex-col lg:flex-row min-h-full gap-4 text-slate-900 dark:text-white">
       {/* Modal de Pago */}
       <PaymentModal
         isOpen={modalPagoAbierto}
@@ -759,6 +767,16 @@ export default function PosScreen() {
         isOpen={demoModalOpen}
         onClose={() => setDemoModalOpen(false)}
         actionName="procesar ventas reales"
+      />
+      <ConfirmationModal
+        isOpen={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        onConfirm={confirmarCancelacion}
+        title="Cancelar Venta"
+        message="¿Estás seguro de que deseas cancelar la venta actual? Se eliminarán todos los productos del carrito."
+        confirmText="Sí, Cancelar"
+        cancelText="No, Volver"
+        isDestructive={true}
       />
       <WeightModal
         isOpen={weightModalOpen}
@@ -908,7 +926,7 @@ export default function PosScreen() {
                         .toString()
                         .padStart(8, "0")}`,
                       120,
-                      30
+                      30,
                     );
                     doc.text(`Fecha de Emisión: ${lastSale?.date}`, 120, 35);
 
@@ -927,7 +945,7 @@ export default function PosScreen() {
                     doc.text(
                       lastSale?.clientName || "Consumidor Final",
                       70,
-                      68
+                      68,
                     );
 
                     doc.setFont("helvetica", "bold");
@@ -1014,7 +1032,7 @@ export default function PosScreen() {
                     doc.text(
                       "Esta factura es un documento no válido como factura fiscal real (Demo Kubo POS)",
                       12,
-                      y + 4
+                      y + 4,
                     );
 
                     const pdfArrayBuffer = doc.output("arraybuffer");
@@ -1149,7 +1167,7 @@ export default function PosScreen() {
               <div className="bg-white p-4 rounded-xl inline-block shadow-inner border border-slate-200">
                 <img
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
-                    serverInfo.url
+                    serverInfo.url,
                   )}`}
                   alt="QR Code"
                   className="w-64 h-64"
@@ -1260,7 +1278,7 @@ export default function PosScreen() {
       {/* ════════════════════════════════════════════════════════ */}
       {/* SECCIÓN DERECHA: TOTALES Y ACCIONES */}
       {/* ════════════════════════════════════════════════════════ */}
-      <div className="w-full lg:w-96 flex flex-col gap-4 shrink-0 h-auto lg:h-full overflow-y-auto lg:overflow-visible">
+      <div className="w-full lg:w-96 flex flex-col gap-4 shrink-0 h-auto lg:h-full overflow-y-auto pb-4">
         {/* Tarjeta de Usuario / Info */}
         <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg space-y-3 transition-colors duration-300">
           <div className="flex justify-between items-center text-slate-500 dark:text-slate-400 text-sm">
@@ -1292,8 +1310,8 @@ export default function PosScreen() {
         </div>
 
         {/* Tarjeta de Totales */}
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl flex-1 flex flex-col justify-between transition-colors duration-300">
-          <div className="space-y-4">
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl flex flex-col transition-colors duration-300">
+          <div className="space-y-2">
             <div className="flex justify-between text-slate-500 dark:text-slate-400 text-lg">
               <span>Subtotal</span>
               <span>${subtotal.toFixed(2)}</span>
@@ -1302,21 +1320,21 @@ export default function PosScreen() {
               <span>Impuestos (0%)</span>
               <span>$0.00</span>
             </div>
-            <div className="h-px bg-slate-200 dark:bg-slate-600 my-4"></div>
+            <div className="h-px bg-slate-200 dark:bg-slate-600 my-2"></div>
             <div className="flex justify-between items-end">
               <span className="text-xl font-bold text-slate-700 dark:text-slate-300">
                 Total a Pagar
               </span>
             </div>
           </div>
-          <div className="text-right text-5xl font-black text-slate-900 dark:text-green-400 tracking-tighter drop-shadow-sm">
+          <div className="text-right text-4xl font-black text-slate-900 dark:text-green-400 tracking-tighter drop-shadow-sm">
             <span className="text-green-600 dark:text-green-400">
               ${total.toFixed(2)}
             </span>
           </div>
 
           {/* Botones de Acción */}
-          <div className="grid gap-3 mt-8">
+          <div className="grid gap-2 mt-4">
             {/* Toggle Impresión */}
             <div
               onClick={() => setShouldPrintTicket(!shouldPrintTicket)}
@@ -1362,10 +1380,10 @@ export default function PosScreen() {
 
             <button
               onClick={abrirModalPago}
-              className="w-full py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-xl shadow-lg shadow-green-900/30 flex items-center justify-center gap-3 transition transform active:scale-95"
+              className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-green-900/30 flex items-center justify-center gap-2 transition transform active:scale-95"
               title="Presiona F9 para cobrar rápido"
             >
-              <CreditCard size={28} /> COBRAR{" "}
+              <CreditCard size={24} /> COBRAR{" "}
               <span className="text-sm opacity-60 font-mono ml-1">[F9]</span>
             </button>
 
