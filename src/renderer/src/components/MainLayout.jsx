@@ -135,7 +135,7 @@ const MainLayout = () => {
             <div
               className={`w-full flex justify-center ${themeClasses.text} font-bold text-xl`}
             >
-              AP
+              {kioskName.charAt(0).toUpperCase()}
             </div>
           )}
 
