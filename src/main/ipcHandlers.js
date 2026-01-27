@@ -742,17 +742,7 @@ function registerIpcHandlers() {
          ORDER BY s.id DESC LIMIT 5`,
       );
 
-      // 5. Top 5 Productos más vendidos (Histórico)
-      const topProducts = await all(
-        `SELECT p.name, SUM(si.quantity) as total_qty
-         FROM sale_items si
-         JOIN products p ON si.product_id = p.id
-         GROUP BY si.product_id
-         ORDER BY total_qty DESC
-         LIMIT 5`,
-      );
-
-      // 6. Ventas últimos 7 días (para gráfico)
+      // 5. Ventas últimos 7 días (para gráfico)
       // Usamos substr para extraer la fecha directamente del timestamp guardado en formato local
       // Esto evita problemas de conversión a UTC que tiene la función date()
       const sevenDaysAgo = new Date();
@@ -773,7 +763,6 @@ function registerIpcHandlers() {
         totalMonth: salesMonth?.total || 0,
         lowStockCount: lowStock?.count || 0,
         lastSales,
-        topProducts,
         salesChartData: salesLast7Days,
       };
     } catch (error) {
@@ -783,7 +772,6 @@ function registerIpcHandlers() {
         totalMonth: 0,
         lowStockCount: 0,
         lastSales: [],
-        topProducts: [],
         salesChartData: [],
       };
     }
@@ -836,19 +824,41 @@ function registerIpcHandlers() {
 
         // 3. Top Productos más vendidos en el periodo
         const topProductsQuery = `
-         SELECT 
-           p.name,
-           SUM(si.quantity) as quantity,
-           SUM(si.subtotal) as total
-         FROM sale_items si
-         JOIN sales s ON si.sale_id = s.id
-         JOIN products p ON si.product_id = p.id
-         WHERE s.timestamp >= ? AND s.timestamp <= ?
-         GROUP BY si.product_id
-         ORDER BY quantity DESC
-         LIMIT 10
-       `;
+          SELECT 
+            p.name,
+            SUM(si.quantity) as quantity,
+            SUM(si.subtotal) as total
+          FROM sale_items si
+          JOIN sales s ON si.sale_id = s.id
+          JOIN products p ON si.product_id = p.id
+          WHERE s.timestamp >= ? AND s.timestamp <= ?
+          GROUP BY si.product_id
+          ORDER BY quantity DESC
+          LIMIT 10
+        `;
         const topProducts = await all(topProductsQuery, [start, end]);
+
+        // 4. Top Productos MENOS vendidos (incluyendo 0 ventas)
+        // Usamos LEFT JOIN con un subquery o filtro en el JOIN para no perder productos sin ventas
+        // pero filtrar las ventas por fecha.
+        const leastSoldQuery = `
+          SELECT 
+            p.name,
+            COALESCE(SUM(filtered_sales.quantity), 0) as quantity,
+            COALESCE(SUM(filtered_sales.subtotal), 0) as total
+          FROM products p
+          LEFT JOIN (
+            SELECT si.product_id, si.quantity, si.subtotal
+            FROM sale_items si
+            JOIN sales s ON si.sale_id = s.id
+            WHERE s.timestamp >= ? AND s.timestamp <= ?
+          ) filtered_sales ON p.id = filtered_sales.product_id
+          WHERE p.is_active = 1
+          GROUP BY p.id
+          ORDER BY quantity ASC, total ASC
+          LIMIT 10
+        `;
+        const leastSoldProducts = await all(leastSoldQuery, [start, end]);
 
         return {
           summary: {
@@ -859,6 +869,7 @@ function registerIpcHandlers() {
           },
           salesByDay: salesByDay || [],
           topProducts: topProducts || [],
+          leastSoldProducts: leastSoldProducts || [],
         };
       } catch (error) {
         console.error("Error en reporte avanzado:", error);

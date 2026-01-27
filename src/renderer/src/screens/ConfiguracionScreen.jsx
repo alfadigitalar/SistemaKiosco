@@ -13,6 +13,9 @@ import {
   AlertTriangle,
   UploadCloud,
   Mail,
+  Layout,
+  CreditCard,
+  Settings,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -25,6 +28,8 @@ const ConfiguracionScreen = () => {
     updateConfig,
     getThemeClasses,
   } = useConfig();
+
+  const [activeTab, setActiveTab] = useState("general");
 
   const [name, setName] = useState(kioskName);
   const [address, setAddress] = useState(kioskAddress);
@@ -88,11 +93,6 @@ const ConfiguracionScreen = () => {
 
     // Cargar logo
     window.api.getSettings().then((settings) => {
-      // Nota: settings puede venir como array o objeto dependiendo de mi fix en index.js,
-      // pero aqui asumimos que el endpoint getSettings retorna objeto (o lo procesa).
-      // Momento, getSettings usa 'get' SELECT * FROM settings LIMIT 1 en ipcHandlers.js?
-      // No, ipcHandlers.js tiene 'get-settings'. Vamos a revisar ese handler luego.
-      // Por ahora asumo que devuelve un objeto con ticket_logo.
       if (settings && settings.ticket_logo) {
         setTicketLogo(settings.ticket_logo);
       }
@@ -103,6 +103,9 @@ const ConfiguracionScreen = () => {
         if (settings.smtp_pass) setSmtpPass(settings.smtp_pass);
       }
     });
+
+    // Cargar backups iniciales
+    loadBackups();
 
     // Sync Tax
     setTaxEnabledLocal(taxEnabled);
@@ -121,6 +124,17 @@ const ConfiguracionScreen = () => {
     taxCertPath,
     taxKeyPath,
   ]);
+
+  const loadBackups = async () => {
+    try {
+      const res = await window.api.invoke("get-backups");
+      if (res && res.success) {
+        setBackups(res.backups || []);
+      }
+    } catch (error) {
+      console.error("Error loading backups:", error);
+    }
+  };
 
   const handleLogoChange = (e) => {
     const file = e.target.files[0];
@@ -151,6 +165,11 @@ const ConfiguracionScreen = () => {
         smtp_port: smtpPort,
         smtp_user: smtpUser,
         smtp_pass: smtpPass,
+        tax_enabled: taxEnabledLocal,
+        tax_cuit: taxCuitLocal,
+        tax_sales_point: taxSalesPointLocal,
+        tax_cert_path: taxCertPathLocal,
+        tax_key_path: taxKeyPathLocal,
       });
 
       // 2. Guardar Perfil Usuario
@@ -199,7 +218,7 @@ const ConfiguracionScreen = () => {
     }
   };
 
-  const theme = getThemeClasses(); // Clases del tema actual para botones
+  const theme = getThemeClasses();
 
   const colors = [
     { id: "blue", name: "Azul", class: "bg-blue-500" },
@@ -220,8 +239,27 @@ const ConfiguracionScreen = () => {
     { id: "pastelOrange", name: "Durazno", class: "bg-orange-400" },
   ];
 
+  const tabs = [
+    { id: "general", label: "General", icon: <Settings size={20} /> },
+    { id: "facturacion", label: "Facturación", icon: <CreditCard size={20} /> },
+    { id: "sistema", label: "Sistema", icon: <Database size={20} /> },
+    { id: "perfil", label: "Perfil", icon: <User size={20} /> },
+  ];
+
+  const SaveButton = () => (
+    <button
+      onClick={handleSave}
+      className={`
+        w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] active:scale-95 mt-4
+        ${theme.bg} ${theme.hover}
+      `}
+    >
+      <Save /> GUARDAR CAMBIOS
+    </button>
+  );
+
   return (
-    <div className="h-full flex flex-col p-6 space-y-6 overflow-y-auto bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white transition-colors duration-300">
+    <div className="h-full flex flex-col p-6 space-y-6 overflow-hidden bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white transition-colors duration-300">
       <div>
         <h1 className="text-3xl font-bold text-slate-800 dark:text-white">
           Configuración
@@ -229,539 +267,584 @@ const ConfiguracionScreen = () => {
         <p className="text-slate-400">Personaliza tu sistema</p>
       </div>
 
-      <div className="max-w-2xl space-y-8">
-        {/* Sección Identidad */}
-        <div
-          className={`bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border ${theme.border} shadow-lg transition-colors`}
-        >
-          <h2
-            className={`text-xl font-bold mb-4 flex items-center gap-2 ${theme.text}`}
+      {/* Tabs Header */}
+      <div className="flex space-x-2 border-b border-slate-200 dark:border-slate-700 pb-1">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`
+              flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-all
+              ${
+                activeTab === tab.id
+                  ? `bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border-x border-t border-slate-200 dark:border-slate-700 shadow-sm relative -bottom-[1px]`
+                  : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/50"
+              }
+            `}
           >
-            <Monitor className="text-slate-400" /> Identidad del Kiosco
-          </h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm text-slate-400 mb-2">
-                Nombre del Negocio
-              </label>
-              <input
-                type="text"
-                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ej: Kiosco Pepe"
-              />
-              <p className="text-xs text-slate-500 mt-2">
-                Este nombre se mostrará en el menú lateral y reportes.
-              </p>
-            </div>
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-            <div>
-              <label className="block text-sm text-slate-400 mb-2">
-                Dirección
-              </label>
-              <input
-                type="text"
-                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Ej: Av. Siempre Viva 742"
-              />
-              <p className="text-xs text-slate-500 mt-2">
-                Esta dirección aparecerá en los pedidos y tickets.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Sección Perfil de Usuario */}
-        <div
-          className={`bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border ${theme.border} shadow-lg transition-colors`}
-        >
-          <h2
-            className={`text-xl font-bold mb-4 flex items-center gap-2 ${theme.text}`}
-          >
-            <User className="text-slate-400" /> Perfil de Usuario
-          </h2>
-          <div className="flex items-start gap-6">
-            {/* Avatar Placeholder / Upload */}
-            <div className="flex flex-col items-center gap-2">
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept="image/*"
-                onChange={handleAvatarChange}
-              />
+      <div className="flex-1 overflow-y-auto pr-2 pb-20 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600">
+        <div className="max-w-3xl space-y-8">
+          {/* TAB: GENERAL */}
+          {activeTab === "general" && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              {/* Sección Identidad */}
               <div
-                onClick={() => fileInputRef.current.click()}
-                className="w-24 h-24 rounded-full bg-slate-200 dark:bg-slate-700 border-4 border-white dark:border-slate-600 flex items-center justify-center overflow-hidden shadow-inner relative group cursor-pointer"
+                className={`bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border ${theme.border} shadow-lg transition-colors`}
               >
-                {avatarPreview ? (
-                  <img
-                    src={avatarPreview}
-                    alt="Avatar"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <User size={40} className="text-slate-400" />
-                )}
-
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span className="text-white text-xs font-bold">Cambiar</span>
-                </div>
-              </div>
-              <p className="text-xs text-slate-500">
-                @{currentUser.username || "usuario"}
-              </p>
-            </div>
-
-            <div className="flex-1 space-y-4">
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">
-                  Fecha de Nacimiento
-                </label>
-                <input
-                  type="date"
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
-                  value={birthday}
-                  onChange={(e) => setBirthday(e.target.value)}
-                />
-                <p className="text-xs text-slate-500 mt-1">
-                  ¡Te saludaremos en tu cumpleaños! 🎉
-                </p>
-              </div>
-
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800">
-                <p className="text-sm text-blue-800 dark:text-blue-300">
-                  <strong>Miembro desde:</strong>{" "}
-                  {new Date().toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Sección Ticket */}
-        <div
-          className={`bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border ${theme.border} shadow-lg transition-colors`}
-        >
-          <h2
-            className={`text-xl font-bold mb-4 flex items-center gap-2 ${theme.text}`}
-          >
-            <Printer className="text-slate-400" /> Configuración de Ticket
-          </h2>
-          <div className="flex items-start gap-6">
-            <div className="flex flex-col items-center gap-2">
-              <input
-                type="file"
-                ref={logoInputRef}
-                className="hidden"
-                accept="image/*"
-                onChange={handleLogoChange}
-              />
-              <div
-                onClick={() => logoInputRef.current.click()}
-                className="w-32 h-32 rounded-lg bg-white dark:bg-slate-900 border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center cursor-pointer overflow-hidden relative group"
-              >
-                {ticketLogo ? (
-                  <img
-                    src={ticketLogo}
-                    alt="Logo"
-                    className="w-full h-full object-contain p-2"
-                  />
-                ) : (
-                  <div className="text-center text-slate-400">
-                    <p className="text-xs">Click para subir</p>
-                    <p className="font-bold text-sm">LOGO</p>
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span className="text-white text-xs font-bold">
-                    Cambiar Logo
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="flex-1">
-              <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                Esta imagen aparecerá en la cabecera de sus tickets impresos. Se
-                recomienda usar una imagen en blanco y negro (monocromática)
-                para mejor calidad en impresoras térmicas.
-              </p>
-              {ticketLogo && (
-                <button
-                  onClick={() => setTicketLogo(null)}
-                  className="text-red-500 text-sm hover:underline"
+                <h2
+                  className={`text-xl font-bold mb-4 flex items-center gap-2 ${theme.text}`}
                 >
-                  Eliminar Logo
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+                  <Monitor className="text-slate-400" /> Identidad del Kiosco
+                </h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-2">
+                      Nombre del Negocio
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Ej: Kiosco Pepe"
+                    />
+                    <p className="text-xs text-slate-500 mt-2">
+                      Este nombre se mostrará en el menú lateral y reportes.
+                    </p>
+                  </div>
 
-        {/* Sección Copias de Seguridad */}
-        <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg transition-colors mb-6">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-900 dark:text-white">
-            <Archive className="text-slate-400" /> Copias de Seguridad
-          </h2>
-          <div className="flex flex-col gap-4">
-            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/50 rounded-lg">
-              <p className="text-sm text-yellow-800 dark:text-yellow-200 flex gap-2">
-                <AlertTriangle className="flex-shrink-0" size={18} />
-                <span>
-                  Realice copias manuales periódicamente. El sistema guarda las
-                  últimas 10 copias automáticamente. Al restaurar una copia, el
-                  sistema se reiniciará.
-                </span>
-              </p>
-            </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-2">
+                      Dirección
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="Ej: Av. Siempre Viva 742"
+                    />
+                    <p className="text-xs text-slate-500 mt-2">
+                      Esta dirección aparecerá en los pedidos y tickets.
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-            <div className="flex justify-start">
-              <button
-                onClick={async () => {
-                  const res = await window.api.invoke("create-backup");
-                  if (res.success) {
-                    toast.success("Copia creada exitosamente");
-                    loadBackups();
-                  } else {
-                    toast.error("Error: " + res.message);
-                  }
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-lg font-bold text-slate-700 dark:text-white transition"
-              >
-                <UploadCloud size={18} /> Crear Copia de Seguridad Ahora
-              </button>
-            </div>
+              {/* Sección Apariencia */}
+              <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg transition-colors">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800 dark:text-white">
+                  <Monitor className="text-slate-400" /> Apariencia
+                </h2>
+                <div className="flex flex-wrap items-center gap-4">
+                  <button
+                    onClick={() => setSelectedMode("light")}
+                    className={`
+                      px-4 py-3 rounded-lg font-bold border-2 transition-all flex items-center gap-2
+                      ${
+                        selectedMode === "light"
+                          ? "bg-white border-blue-500 text-blue-600 shadow-md"
+                          : "bg-slate-200 text-slate-500 border-transparent hover:bg-slate-300"
+                      }
+                    `}
+                  >
+                    <Sun size={20} /> Modo Claro
+                  </button>
+                  <button
+                    onClick={() => setSelectedMode("dark")}
+                    className={`
+                      px-4 py-3 rounded-lg font-bold border-2 transition-all flex items-center gap-2
+                      ${
+                        selectedMode === "dark"
+                          ? "bg-slate-900 border-blue-500 text-blue-400 shadow-md"
+                          : "bg-slate-300 text-slate-600 border-transparent hover:bg-slate-400"
+                      }
+                    `}
+                  >
+                    <Moon size={20} /> Modo Oscuro
+                  </button>
+                  <button
+                    onClick={() => setSelectedMode("auto")}
+                    className={`
+                      px-4 py-3 rounded-lg font-bold border-2 transition-all flex items-center gap-2
+                      ${
+                        selectedMode === "auto"
+                          ? "bg-gradient-to-r from-orange-100 to-slate-900 border-blue-500 text-blue-600 dark:text-blue-400 shadow-md"
+                          : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-transparent hover:bg-slate-300 dark:hover:bg-slate-700"
+                      }
+                    `}
+                  >
+                    <Archive size={20} /> Automático
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  El modo automático alterna entre claro y oscuro según la hora
+                  (07:00 - 20:00).
+                </p>
+              </div>
 
-            {/* Listado de backups */}
-            {backups.length > 0 && (
-              <div className="mt-4 border-t border-slate-200 dark:border-slate-700 pt-4">
-                <h3 className="font-bold text-sm text-slate-700 dark:text-slate-300 mb-3">
-                  Historial de Copias
-                </h3>
-                <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-                  {backups.map((bak) => (
-                    <div
-                      key={bak.name}
-                      className="flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700"
+              {/* Sección Tema */}
+              <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg transition-colors">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                  <Palette className="text-slate-400" /> Color del Tema
+                </h2>
+                <div className="flex gap-4 flex-wrap">
+                  {colors.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => setSelectedColor(c.id)}
+                      className={`
+                              w-16 h-16 rounded-xl flex items-center justify-center border-2 transition-all transform hover:scale-105
+                              ${c.class}
+                              ${
+                                selectedColor === c.id
+                                  ? "border-white scale-105 shadow-xl ring-2 ring-white/20"
+                                  : "border-transparent opacity-70 hover:opacity-100"
+                              }
+                          `}
+                      title={c.name}
                     >
-                      <div>
-                        <p className="text-xs font-mono text-slate-600 dark:text-slate-400">
-                          {bak.name}
-                        </p>
-                        <p className="text-[10px] text-slate-400">
-                          {new Date(bak.date).toLocaleString()} -{" "}
-                          {(bak.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
-                      <button
-                        onClick={async () => {
-                          if (
-                            confirm(
-                              `¿Está seguro de RESTAURAR esta copia? \n${bak.name}\n\nEL SISTEMA SE REINICIARÁ Y SE PERDERÁN LOS DATOS NO GUARDADOS DESDE ESA COPIA.`
-                            )
-                          ) {
-                            const res = await window.api.invoke(
-                              "restore-backup",
-                              bak.name
-                            );
-                            if (!res.success) toast.error(res.message);
-                          }
-                        }}
-                        className="text-xs bg-slate-200 hover:bg-red-500 hover:text-white dark:bg-slate-700 dark:hover:bg-red-600 px-3 py-1 rounded transition-colors"
-                      >
-                        Restaurar
-                      </button>
-                    </div>
+                      {selectedColor === c.id && (
+                        <div className="w-3 h-3 bg-white rounded-full" />
+                      )}
+                    </button>
                   ))}
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Sección Gestión de Datos */}
-        <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg transition-colors mb-6">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-900 dark:text-white">
-            <Database className="text-slate-400" /> Gestión de Datos
-          </h2>
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-sm text-slate-600 dark:text-slate-300">
-              <p>
-                Exporte su base de datos completa (Productos, Clientes, Ventas)
-                a formato Excel (CSV) para realizar copias de seguridad o
-                análisis externos.
-              </p>
-            </div>
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-all shadow-md active:scale-95 whitespace-nowrap"
-            >
-              <Database size={20} />
-              Exportar a Excel
-            </button>
-          </div>
-        </div>
-
-        {/* Sección Tema */}
-        <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg transition-colors">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <Palette className="text-slate-400" /> Color del Tema
-          </h2>
-          <div className="flex gap-4 flex-wrap">
-            {colors.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setSelectedColor(c.id)}
-                className={`
-                        w-16 h-16 rounded-xl flex items-center justify-center border-2 transition-all transform hover:scale-105
-                        ${c.class}
-                        ${
-                          selectedColor === c.id
-                            ? "border-white scale-105 shadow-xl ring-2 ring-white/20"
-                            : "border-transparent opacity-70 hover:opacity-100"
-                        }
-                     `}
-                title={c.name}
-              >
-                {selectedColor === c.id && (
-                  <div className="w-3 h-3 bg-white rounded-full" />
-                )}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-slate-500 mt-4">
-            Selecciona el color de énfasis para botones, iconos y bordes
-            activos.
-          </p>
-        </div>
-
-        {/* Sección Facturación Electrónica (ARCA / AFIP) */}
-        <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg transition-colors">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800 dark:text-white">
-            <Printer className="text-slate-400" /> Facturación Electrónica
-            (ARCA)
-          </h2>
-
-          <div className="mb-4">
-            <div className="flex items-center gap-3 mb-2">
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                  checked={taxEnabledLocal}
-                  onChange={(e) => setTaxEnabledLocal(e.target.checked)}
-                />
-                <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                <span className="ml-3 text-sm font-medium text-slate-900 dark:text-slate-300">
-                  {taxEnabledLocal ? "Habilitado" : "Deshabilitado"}
-                </span>
-              </label>
-            </div>
-            <p className="text-xs text-slate-500 mb-4">
-              Habilita la emisión de comprobantes autorizados (CAE) directamente
-              con ARCA/AFIP.
-            </p>
-          </div>
-
-          {taxEnabledLocal && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-4">
-              <div>
-                <label className="block text-sm text-slate-400 mb-2">
-                  CUIT (Sin guiones)
-                </label>
-                <input
-                  type="text"
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
-                  value={taxCuitLocal}
-                  onChange={(e) => setTaxCuitLocal(e.target.value)}
-                  placeholder="20123456789"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-2">
-                  Punto de Venta
-                </label>
-                <input
-                  type="number"
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
-                  value={taxSalesPointLocal}
-                  onChange={(e) => setTaxSalesPointLocal(e.target.value)}
-                  placeholder="Ej: 3"
-                />
-              </div>
-
-              {/* Certificados */}
-              <div className="col-span-1 md:col-span-2 space-y-3 pt-2 border-t border-slate-200 dark:border-slate-700 mt-2">
-                <h3 className="font-bold text-sm text-slate-700 dark:text-slate-300">
-                  Certificados Digitales (.crt y .key)
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Debe generar estos archivos en el sitio web de ARCA y
-                  guardarlos en una carpeta segura del sistema.
+                <p className="text-xs text-slate-500 mt-4">
+                  Selecciona el color de énfasis para botones, iconos y bordes
+                  activos.
                 </p>
+              </div>
 
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">
-                    Ruta al Certificado (.crt)
-                  </label>
-                  <div className="flex gap-2">
+              <SaveButton />
+            </div>
+          )}
+
+          {/* TAB: FACTURACIÓN */}
+          {activeTab === "facturacion" && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              {/* Sección Ticket */}
+              <div
+                className={`bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border ${theme.border} shadow-lg transition-colors`}
+              >
+                <h2
+                  className={`text-xl font-bold mb-4 flex items-center gap-2 ${theme.text}`}
+                >
+                  <Printer className="text-slate-400" /> Configuración de Ticket
+                </h2>
+                <div className="flex items-start gap-6">
+                  <div className="flex flex-col items-center gap-2">
                     <input
-                      type="text"
-                      value={taxCertPathLocal}
-                      onChange={(e) => setTaxCertPathLocal(e.target.value)}
-                      className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-xs font-mono"
-                      placeholder="C:\Kiosco\Certificados\produccion.crt"
+                      type="file"
+                      ref={logoInputRef}
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleLogoChange}
                     />
+                    <div
+                      onClick={() => logoInputRef.current.click()}
+                      className="w-32 h-32 rounded-lg bg-white dark:bg-slate-900 border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center cursor-pointer overflow-hidden relative group"
+                    >
+                      {ticketLogo ? (
+                        <img
+                          src={ticketLogo}
+                          alt="Logo"
+                          className="w-full h-full object-contain p-2"
+                        />
+                      ) : (
+                        <div className="text-center text-slate-400">
+                          <p className="text-xs">Click para subir</p>
+                          <p className="font-bold text-sm">LOGO</p>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-white text-xs font-bold">
+                          Cambiar Logo
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">
-                    Ruta a la Llave Privada (.key)
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={taxKeyPathLocal}
-                      onChange={(e) => setTaxKeyPathLocal(e.target.value)}
-                      className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-xs font-mono"
-                      placeholder="C:\Kiosco\Certificados\produccion.key"
-                    />
+                  <div className="flex-1">
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                      Esta imagen aparecerá en la cabecera de sus tickets
+                      impresos. Se recomienda usar una imagen en blanco y negro
+                      (monocromática) para mejor calidad en impresoras térmicas.
+                    </p>
+                    {ticketLogo && (
+                      <button
+                        onClick={() => setTicketLogo(null)}
+                        className="text-red-500 text-sm hover:underline"
+                      >
+                        Eliminar Logo
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
+
+              {/* Sección Facturación Electrónica (ARCA / AFIP) */}
+              <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg transition-colors">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800 dark:text-white">
+                  <CreditCard className="text-slate-400" /> Facturación
+                  Electrónica (ARCA)
+                </h2>
+
+                <div className="mb-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={taxEnabledLocal}
+                        onChange={(e) => setTaxEnabledLocal(e.target.checked)}
+                      />
+                      <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                      <span className="ml-3 text-sm font-medium text-slate-900 dark:text-slate-300">
+                        {taxEnabledLocal ? "Habilitado" : "Deshabilitado"}
+                      </span>
+                    </label>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-4">
+                    Habilita la emisión de comprobantes autorizados (CAE)
+                    directamente con ARCA/AFIP.
+                  </p>
+                </div>
+
+                {taxEnabledLocal && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-4">
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-2">
+                        CUIT (Sin guiones)
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+                        value={taxCuitLocal}
+                        onChange={(e) => setTaxCuitLocal(e.target.value)}
+                        placeholder="20123456789"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-2">
+                        Punto de Venta
+                      </label>
+                      <input
+                        type="number"
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+                        value={taxSalesPointLocal}
+                        onChange={(e) => setTaxSalesPointLocal(e.target.value)}
+                        placeholder="Ej: 3"
+                      />
+                    </div>
+
+                    {/* Certificados */}
+                    <div className="col-span-1 md:col-span-2 space-y-3 pt-2 border-t border-slate-200 dark:border-slate-700 mt-2">
+                      <h3 className="font-bold text-sm text-slate-700 dark:text-slate-300">
+                        Certificados Digitales (.crt y .key)
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Debe generar estos archivos en el sitio web de ARCA y
+                        guardarlos en una carpeta segura del sistema.
+                      </p>
+
+                      <div>
+                        <label className="block text-sm text-slate-400 mb-1">
+                          Ruta al Certificado (.crt)
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={taxCertPathLocal}
+                            onChange={(e) =>
+                              setTaxCertPathLocal(e.target.value)
+                            }
+                            className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-xs font-mono"
+                            placeholder="C:\Kiosco\Certificados\produccion.crt"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm text-slate-400 mb-1">
+                          Ruta a la Llave Privada (.key)
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={taxKeyPathLocal}
+                            onChange={(e) => setTaxKeyPathLocal(e.target.value)}
+                            className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-xs font-mono"
+                            placeholder="C:\Kiosco\Certificados\produccion.key"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <SaveButton />
+            </div>
+          )}
+
+          {/* TAB: SISTEMA */}
+          {activeTab === "sistema" && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              {/* Sección Copias de Seguridad */}
+              <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg transition-colors">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-900 dark:text-white">
+                  <Archive className="text-slate-400" /> Copias de Seguridad
+                </h2>
+                <div className="flex flex-col gap-4">
+                  <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/50 rounded-lg">
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200 flex gap-2">
+                      <AlertTriangle className="flex-shrink-0" size={18} />
+                      <span>
+                        Realice copias manuales periódicamente. El sistema
+                        guarda las últimas 10 copias automáticamente. Al
+                        restaurar una copia, el sistema se reiniciará.
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="flex justify-start">
+                    <button
+                      onClick={async () => {
+                        const res = await window.api.invoke("create-backup");
+                        if (res.success) {
+                          toast.success("Copia creada exitosamente");
+                          loadBackups();
+                        } else {
+                          toast.error("Error: " + res.message);
+                        }
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-lg font-bold text-slate-700 dark:text-white transition"
+                    >
+                      <UploadCloud size={18} /> Crear Copia de Seguridad Ahora
+                    </button>
+                  </div>
+
+                  {/* Listado de backups */}
+                  {backups.length > 0 && (
+                    <div className="mt-4 border-t border-slate-200 dark:border-slate-700 pt-4">
+                      <h3 className="font-bold text-sm text-slate-700 dark:text-slate-300 mb-3">
+                        Historial de Copias
+                      </h3>
+                      <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                        {backups.map((bak) => (
+                          <div
+                            key={bak.name}
+                            className="flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700"
+                          >
+                            <div>
+                              <p className="text-xs font-mono text-slate-600 dark:text-slate-400">
+                                {bak.name}
+                              </p>
+                              <p className="text-[10px] text-slate-400">
+                                {new Date(bak.date).toLocaleString()} -{" "}
+                                {(bak.size / 1024 / 1024).toFixed(2)} MB
+                              </p>
+                            </div>
+                            <button
+                              onClick={async () => {
+                                if (
+                                  confirm(
+                                    `¿Está seguro de RESTAURAR esta copia? \n${bak.name}\n\nEL SISTEMA SE REINICIARÁ Y SE PERDERÁN LOS DATOS NO GUARDADOS DESDE ESA COPIA.`,
+                                  )
+                                ) {
+                                  const res = await window.api.invoke(
+                                    "restore-backup",
+                                    bak.name,
+                                  );
+                                  if (!res.success) toast.error(res.message);
+                                }
+                              }}
+                              className="text-xs bg-slate-200 hover:bg-red-500 hover:text-white dark:bg-slate-700 dark:hover:bg-red-600 px-3 py-1 rounded transition-colors"
+                            >
+                              Restaurar
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Sección Gestión de Datos */}
+              <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg transition-colors">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-900 dark:text-white">
+                  <Database className="text-slate-400" /> Gestión de Datos
+                </h2>
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="text-sm text-slate-600 dark:text-slate-300">
+                    <p>
+                      Exporte su base de datos completa (Productos, Clientes,
+                      Ventas) a formato Excel (CSV) para realizar copias de
+                      seguridad o análisis externos.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleExport}
+                    className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-all shadow-md active:scale-95 whitespace-nowrap"
+                  >
+                    <Database size={20} />
+                    Exportar a Excel
+                  </button>
+                </div>
+              </div>
+
+              {/* Sección Configuración de Email */}
+              <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg transition-colors">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800 dark:text-white">
+                  <Mail className="text-slate-400" /> Configuración de Correo
+                  (SMTP)
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-2">
+                      Servidor SMTP
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+                      value={smtpHost}
+                      onChange={(e) => setSmtpHost(e.target.value)}
+                      placeholder="Ej: smtp.gmail.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-2">
+                      Puerto
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+                      value={smtpPort}
+                      onChange={(e) => setSmtpPort(e.target.value)}
+                      placeholder="Ej: 587"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-2">
+                      Usuario / Email
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+                      value={smtpUser}
+                      onChange={(e) => setSmtpUser(e.target.value)}
+                      placeholder="ejemplo@gmail.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-2">
+                      Contraseña (App Password)
+                    </label>
+                    <input
+                      type="password"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+                      value={smtpPass}
+                      onChange={(e) => setSmtpPass(e.target.value)}
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  <div className="col-span-1 md:col-span-2">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Nota: Para Gmail, utilice una "Contraseña de Aplicación".
+                      No use su contraseña personal.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <SaveButton />
+            </div>
+          )}
+
+          {/* TAB: PERFIL */}
+          {activeTab === "perfil" && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              {/* Sección Perfil de Usuario */}
+              <div
+                className={`bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border ${theme.border} shadow-lg transition-colors`}
+              >
+                <h2
+                  className={`text-xl font-bold mb-4 flex items-center gap-2 ${theme.text}`}
+                >
+                  <User className="text-slate-400" /> Perfil de Usuario
+                </h2>
+                <div className="flex items-start gap-6">
+                  {/* Avatar Placeholder / Upload */}
+                  <div className="flex flex-col items-center gap-2">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleAvatarChange}
+                    />
+                    <div
+                      onClick={() => fileInputRef.current.click()}
+                      className="w-24 h-24 rounded-full bg-slate-200 dark:bg-slate-700 border-4 border-white dark:border-slate-600 flex items-center justify-center overflow-hidden shadow-inner relative group cursor-pointer"
+                    >
+                      {avatarPreview ? (
+                        <img
+                          src={avatarPreview}
+                          alt="Avatar"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User size={40} className="text-slate-400" />
+                      )}
+
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-white text-xs font-bold">
+                          Cambiar
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      @{currentUser.username || "usuario"}
+                    </p>
+                  </div>
+
+                  <div className="flex-1 space-y-4">
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-1">
+                        Fecha de Nacimiento
+                      </label>
+                      <input
+                        type="date"
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+                        value={birthday}
+                        onChange={(e) => setBirthday(e.target.value)}
+                      />
+                      <p className="text-xs text-slate-500 mt-1">
+                        ¡Te saludaremos en tu cumpleaños! 🎉
+                      </p>
+                    </div>
+
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800">
+                      <p className="text-sm text-blue-800 dark:text-blue-300">
+                        <strong>Miembro desde:</strong>{" "}
+                        {new Date().toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <SaveButton />
             </div>
           )}
         </div>
-
-        {/* Sección Configuración de Email */}
-        <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg transition-colors">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800 dark:text-white">
-            <Mail className="text-slate-400" /> Configuración de Correo (SMTP)
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-slate-400 mb-2">
-                Servidor SMTP
-              </label>
-              <input
-                type="text"
-                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
-                value={smtpHost}
-                onChange={(e) => setSmtpHost(e.target.value)}
-                placeholder="Ej: smtp.gmail.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-slate-400 mb-2">
-                Puerto
-              </label>
-              <input
-                type="text"
-                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
-                value={smtpPort}
-                onChange={(e) => setSmtpPort(e.target.value)}
-                placeholder="Ej: 587"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-slate-400 mb-2">
-                Usuario / Email
-              </label>
-              <input
-                type="text"
-                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
-                value={smtpUser}
-                onChange={(e) => setSmtpUser(e.target.value)}
-                placeholder="ejemplo@gmail.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-slate-400 mb-2">
-                Contraseña (App Password)
-              </label>
-              <input
-                type="password"
-                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
-                value={smtpPass}
-                onChange={(e) => setSmtpPass(e.target.value)}
-                placeholder="••••••••"
-              />
-            </div>
-            <div className="col-span-1 md:col-span-2">
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Nota: Para Gmail, utilice una "Contraseña de Aplicación". No use
-                su contraseña personal.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Sección Modo Claro/Oscuro */}
-        <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg transition-colors">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800 dark:text-white">
-            <Monitor className="text-slate-400" /> Apariencia
-          </h2>
-          <div className="flex flex-wrap items-center gap-4">
-            <button
-              onClick={() => setSelectedMode("light")}
-              className={`
-                px-4 py-3 rounded-lg font-bold border-2 transition-all flex items-center gap-2
-                ${
-                  selectedMode === "light"
-                    ? "bg-white border-blue-500 text-blue-600 shadow-md"
-                    : "bg-slate-200 text-slate-500 border-transparent hover:bg-slate-300"
-                }
-              `}
-            >
-              <Sun size={20} /> Modo Claro
-            </button>
-            <button
-              onClick={() => setSelectedMode("dark")}
-              className={`
-                px-4 py-3 rounded-lg font-bold border-2 transition-all flex items-center gap-2
-                ${
-                  selectedMode === "dark"
-                    ? "bg-slate-900 border-blue-500 text-blue-400 shadow-md"
-                    : "bg-slate-300 text-slate-600 border-transparent hover:bg-slate-400"
-                }
-              `}
-            >
-              <Moon size={20} /> Modo Oscuro
-            </button>
-            <button
-              onClick={() => setSelectedMode("auto")}
-              className={`
-                px-4 py-3 rounded-lg font-bold border-2 transition-all flex items-center gap-2
-                ${
-                  selectedMode === "auto"
-                    ? "bg-gradient-to-r from-orange-100 to-slate-900 border-blue-500 text-blue-600 dark:text-blue-400 shadow-md"
-                    : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-transparent hover:bg-slate-300 dark:hover:bg-slate-700"
-                }
-              `}
-            >
-              <Archive size={20} /> Automático
-            </button>
-          </div>
-          <p className="text-xs text-slate-500 mt-2">
-            El modo automático alterna entre claro y oscuro según la hora (07:00
-            - 20:00).
-          </p>
-        </div>
-
-        {/* Botón Guardar */}
-        <button
-          onClick={handleSave}
-          className={`
-             w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] active:scale-95
-             ${theme.bg} ${theme.hover}
-           `}
-        >
-          <Save /> GUARDAR CAMBIOS
-        </button>
       </div>
     </div>
   );

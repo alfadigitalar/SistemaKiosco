@@ -263,9 +263,9 @@ const DashboardScreen = () => {
       {/* ════════════════════════════════════════════════════ */}
       {/* SECCIÓN 3: GRÁFICOS Y TOP PRODUCTS                   */}
       {/* ════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-[300px]">
+      <div className="grid grid-cols-1 gap-6 flex-1 min-h-[300px]">
         {/* Gráfico Simple de Ventas (Barras usando CSS) */}
-        <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg flex flex-col">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg flex flex-col">
           <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-6">
             Evolución de Ventas (7 días)
           </h2>
@@ -319,54 +319,6 @@ const DashboardScreen = () => {
                 Sin datos recientes
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Productos Top */}
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg overflow-hidden flex flex-col">
-          <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-            <ShoppingBag
-              size={20}
-              className="text-purple-600 dark:text-purple-400"
-            />
-            Top Productos
-          </h2>
-          <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
-            <ul className="space-y-3">
-              {stats?.topProducts?.map((prod, index) => (
-                <li
-                  key={index}
-                  className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700/30 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <div
-                      className={`flex items-center justify-center w-7 h-7 min-w-[28px] flex-shrink-0 rounded-full text-xs font-bold ${
-                        index === 0
-                          ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-400"
-                          : index === 1
-                            ? "bg-slate-200 text-slate-700 dark:bg-slate-600 dark:text-slate-200"
-                            : index === 2
-                              ? "bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-400"
-                              : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400"
-                      }`}
-                    >
-                      {index + 1}
-                    </div>
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">
-                      {prod.name}
-                    </span>
-                  </div>
-                  <span className="text-xs font-bold px-2 py-1 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-lg shadow-sm whitespace-nowrap ml-2">
-                    {prod.total_qty} u.
-                  </span>
-                </li>
-              ))}
-              {(!stats?.topProducts || stats.topProducts.length === 0) && (
-                <p className="text-slate-500 text-sm text-center py-10 opacity-50">
-                  Esperando ventas...
-                </p>
-              )}
-            </ul>
           </div>
         </div>
       </div>

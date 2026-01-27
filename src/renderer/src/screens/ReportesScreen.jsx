@@ -98,6 +98,18 @@ const ReportesScreen = () => {
         ]),
       });
 
+      // Least Sold Products Table
+      doc.text("Productos Menos Vendidos", 14, doc.lastAutoTable.finalY + 15);
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 20,
+        head: [["Producto", "Cantidad", "Total $"]],
+        body: reportData.leastSoldProducts.map((p) => [
+          p.name,
+          p.quantity,
+          `$${p.total.toLocaleString()}`,
+        ]),
+      });
+
       doc.save(`Reporte_${startDate}_${endDate}.pdf`);
       toast.success("PDF descargado");
     } catch (e) {
@@ -118,11 +130,18 @@ const ReportesScreen = () => {
         csvContent += `${row.date},${row.total.toFixed(2)}\n`;
       });
 
-      // 2. Top Productos (Append to same file or separate? Let's do separate sections)
+      // 2. Top Productos (Mas Vendidos)
       csvContent += "\n\nPRODUCTOS MAS VENDIDOS\n";
       csvContent += "Producto,Cantidad,Total $\n";
       reportData.topProducts.forEach((p) => {
-        // Escape commas in names
+        const cleanName = p.name.replace(/,/g, " ");
+        csvContent += `${cleanName},${p.quantity},${p.total.toFixed(2)}\n`;
+      });
+
+      // 3. Top Productos (Menos Vendidos)
+      csvContent += "\n\nPRODUCTOS MENOS VENDIDOS\n";
+      csvContent += "Producto,Cantidad,Total $\n";
+      reportData.leastSoldProducts.forEach((p) => {
         const cleanName = p.name.replace(/,/g, " ");
         csvContent += `${cleanName},${p.quantity},${p.total.toFixed(2)}\n`;
       });
@@ -130,14 +149,14 @@ const ReportesScreen = () => {
       csvContent += "\n\nRESUMEN GENERAL\n";
       csvContent += "Concepto,Valor\n";
       csvContent += `Ventas Totales,${reportData.summary.totalSales.toFixed(
-        2
+        2,
       )}\n`;
       csvContent += `Ganancia Estimada,${reportData.summary.estimatedProfit.toFixed(
-        2
+        2,
       )}\n`;
       csvContent += `Transacciones,${reportData.summary.totalTransactions}\n`;
       csvContent += `Ticket Promedio,${reportData.summary.averageTicket.toFixed(
-        2
+        2,
       )}\n`;
 
       const encodedUri = encodeURI(csvContent);
@@ -145,7 +164,7 @@ const ReportesScreen = () => {
       link.setAttribute("href", encodedUri);
       link.setAttribute(
         "download",
-        `Reporte_Datos_${startDate}_${endDate}.csv`
+        `Reporte_Datos_${startDate}_${endDate}.csv`,
       );
       document.body.appendChild(link);
       link.click();
@@ -157,6 +176,9 @@ const ReportesScreen = () => {
       toast.error("Error al exportar CSV");
     }
   };
+
+  // State to toggle between Most Sold and Least Sold
+  const [showLeastSold, setShowLeastSold] = useState(false);
 
   // Simple CSS Bar Chart Component
   const BarChart = ({ data }) => {
@@ -330,11 +352,41 @@ const ReportesScreen = () => {
               </div>
             </div>
 
-            {/* Top Products */}
+            {/* Top Products / Least Sold Products Toggle */}
             <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col h-full">
-              <h2 className="text-lg font-bold mb-4">Top 10 Productos</h2>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-bold">
+                  {showLeastSold ? "Menos Vendidos" : "Más Vendidos"}
+                </h2>
+                <div className="bg-slate-100 dark:bg-slate-700 p-1 rounded-lg flex text-xs">
+                  <button
+                    onClick={() => setShowLeastSold(false)}
+                    className={`px-2 py-1 rounded-md transition ${
+                      !showLeastSold
+                        ? "bg-white dark:bg-slate-600 shadow text-slate-900 dark:text-white"
+                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700"
+                    }`}
+                  >
+                    Más
+                  </button>
+                  <button
+                    onClick={() => setShowLeastSold(true)}
+                    className={`px-2 py-1 rounded-md transition ${
+                      showLeastSold
+                        ? "bg-white dark:bg-slate-600 shadow text-slate-900 dark:text-white"
+                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700"
+                    }`}
+                  >
+                    Menos
+                  </button>
+                </div>
+              </div>
+
               <div className="flex-1 overflow-y-auto space-y-4 pr-2">
-                {reportData.topProducts.map((product, idx) => (
+                {(showLeastSold
+                  ? reportData.leastSoldProducts
+                  : reportData.topProducts
+                ).map((product, idx) => (
                   <div
                     key={idx}
                     className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl hover:bg-slate-100 transition"
@@ -352,9 +404,11 @@ const ReportesScreen = () => {
                         </p>
                       </div>
                     </div>
-                    <p className="font-bold text-sm text-slate-700 dark:text-slate-300">
-                      ${product.total.toLocaleString()}
-                    </p>
+                    <div className="text-right">
+                      <p className="font-bold text-sm text-slate-700 dark:text-slate-300">
+                        ${product.total.toLocaleString()}
+                      </p>
+                    </div>
                   </div>
                 ))}
               </div>
