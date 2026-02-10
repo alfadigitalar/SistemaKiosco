@@ -128,11 +128,12 @@ function registerIpcHandlers() {
         measurement_unit,
         is_promo, // Nuevo
         promo_items, // Nuevo: Array de { product_id, quantity }
+        expiration_date, // FEFO
       } = product;
 
       const result = await run(
-        `INSERT INTO products (barcode, name, cost_price, sale_price, stock_quantity, min_stock, category_id, supplier_id, measurement_unit, is_promo)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO products (barcode, name, cost_price, sale_price, stock_quantity, min_stock, category_id, supplier_id, measurement_unit, is_promo, expiration_date)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           barcode || null,
           name || "", // Prevent NOT NULL error if undefined
@@ -144,6 +145,7 @@ function registerIpcHandlers() {
           supplier_id,
           measurement_unit || "un",
           is_promo ? 1 : 0,
+          expiration_date || null,
         ],
       );
 
@@ -187,11 +189,12 @@ function registerIpcHandlers() {
         measurement_unit,
         is_promo, // Nuevo
         promo_items, // Nuevo
+        expiration_date, // FEFO
       } = product;
 
       await run(
         `UPDATE products 
-         SET barcode=?, name=?, cost_price=?, sale_price=?, stock_quantity=?, min_stock=?, category_id=?, supplier_id=?, measurement_unit=?, is_promo=?
+         SET barcode=?, name=?, cost_price=?, sale_price=?, stock_quantity=?, min_stock=?, category_id=?, supplier_id=?, measurement_unit=?, is_promo=?, expiration_date=?
          WHERE id=?`,
         [
           barcode || null, // Allow NULL if empty string
@@ -204,6 +207,7 @@ function registerIpcHandlers() {
           supplier_id,
           measurement_unit || "un",
           is_promo ? 1 : 0, // is_promo no estaba en el update, agregarlo
+          expiration_date || null,
           id,
         ],
       );
@@ -290,6 +294,29 @@ function registerIpcHandlers() {
       return promosWithItems;
     } catch (error) {
       console.error("Error al obtener promos activas:", error);
+      return [];
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // HANDLERS DE FEFO (Control de Vencimientos)
+  // ═══════════════════════════════════════════════════════════
+
+  // Obtener productos próximos a vencer
+  ipcMain.handle("get-expiring-products", async (event, { days = 7 } = {}) => {
+    try {
+      const products = await all(
+        `SELECT * FROM products 
+         WHERE is_active = 1 
+           AND expiration_date IS NOT NULL 
+           AND date(expiration_date) <= date('now', '+' || ? || ' days')
+           AND date(expiration_date) >= date('now', '-30 days')
+         ORDER BY expiration_date ASC`,
+        [days],
+      );
+      return products;
+    } catch (error) {
+      console.error("Error al obtener productos por vencer:", error);
       return [];
     }
   });

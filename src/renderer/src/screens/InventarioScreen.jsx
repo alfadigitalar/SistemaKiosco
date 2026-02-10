@@ -9,6 +9,7 @@ import {
   X,
   Barcode,
   History,
+  Calendar,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import StockDetailModal from "../components/StockDetailModal";
@@ -51,6 +52,8 @@ const InventarioScreen = () => {
     // Promo specific props
     is_promo: false,
     promo_items: [], // Array of { product_id, quantity }
+    // FEFO
+    expiration_date: "",
   });
 
   // State for promo components selection
@@ -114,6 +117,7 @@ const InventarioScreen = () => {
           measurement_unit: "un",
           is_promo: false,
           promo_items: [],
+          expiration_date: "",
         });
         setIsModalOpen(true);
         // Enfocar input (delay para render)
@@ -144,6 +148,7 @@ const InventarioScreen = () => {
         measurement_unit: product.measurement_unit || "un",
         is_promo: !!product.is_promo,
         promo_items: [],
+        expiration_date: product.expiration_date || "",
       });
       // Load promo items if it's a promo
       if (product.is_promo) {
@@ -180,6 +185,7 @@ const InventarioScreen = () => {
         measurement_unit: "un",
         is_promo: activeTab === "promos", // Auto-set if on promos tab
         promo_items: [],
+        expiration_date: "",
       });
       setSelectedComponents([]);
     }
@@ -410,6 +416,9 @@ const InventarioScreen = () => {
                 Stock
               </th>
               <th className="p-4 text-slate-500 dark:text-slate-400 font-medium text-center">
+                Vencimiento
+              </th>
+              <th className="p-4 text-slate-500 dark:text-slate-400 font-medium text-center">
                 Acciones
               </th>
             </tr>
@@ -417,13 +426,13 @@ const InventarioScreen = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="6" className="p-8 text-center text-slate-500">
+                <td colSpan="7" className="p-8 text-center text-slate-500">
                   Cargando inventario...
                 </td>
               </tr>
             ) : filteredProducts.length === 0 ? (
               <tr>
-                <td colSpan="6" className="p-8 text-center text-slate-500">
+                <td colSpan="7" className="p-8 text-center text-slate-500">
                   No se encontraron productos
                 </td>
               </tr>
@@ -450,17 +459,61 @@ const InventarioScreen = () => {
                   </td>
                   <td className="p-4 text-center">
                     <span
-                      className={`px-3 py-1 rounded-full text-sm font-bold ${
+                      className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold ${
                         product.stock_quantity <= product.min_stock
                           ? "bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 border border-red-500/30"
                           : "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
                       }`}
                     >
-                      {product.stock_quantity}{" "}
+                      {product.stock_quantity}
                       {product.stock_quantity <= product.min_stock && (
-                        <AlertTriangle className="inline w-3 h-3 ml-1 -mt-0.5" />
+                        <AlertTriangle className="w-3 h-3" />
                       )}
                     </span>
+                  </td>
+                  <td className="p-4 text-center">
+                    {(() => {
+                      if (!product.expiration_date)
+                        return <span className="text-slate-400">-</span>;
+                      const expDate = new Date(
+                        product.expiration_date + "T00:00:00",
+                      );
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const daysUntil = Math.ceil(
+                        (expDate - today) / (1000 * 60 * 60 * 24),
+                      );
+
+                      let badgeClass =
+                        "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300";
+                      let icon = null;
+
+                      if (daysUntil < 0) {
+                        badgeClass =
+                          "bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 border border-red-500/30";
+                        icon = (
+                          <AlertTriangle className="inline w-3 h-3 ml-1 -mt-0.5" />
+                        );
+                      } else if (daysUntil <= 7) {
+                        badgeClass =
+                          "bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 border border-amber-500/30";
+                        icon = (
+                          <Calendar className="inline w-3 h-3 ml-1 -mt-0.5" />
+                        );
+                      }
+
+                      return (
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${badgeClass}`}
+                        >
+                          {expDate.toLocaleDateString("es-AR", {
+                            day: "2-digit",
+                            month: "short",
+                          })}
+                          {icon}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="p-4 flex justify-center gap-2">
                     <button
@@ -664,6 +717,26 @@ const InventarioScreen = () => {
                         <option value="lt">Litro (l)</option>
                         <option value="mt">Metro (m)</option>
                       </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">
+                        Fecha de Vencimiento (Opcional)
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="date"
+                          className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 pl-9 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none transition-colors"
+                          value={formData.expiration_date || ""}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              expiration_date: e.target.value,
+                            })
+                          }
+                        />
+                        <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 w-5 h-5" />
+                      </div>
                     </div>
                   </>
                 )}

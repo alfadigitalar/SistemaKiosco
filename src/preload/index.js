@@ -39,6 +39,10 @@ contextBridge.exposeInMainWorld("api", {
   getStockMovements: (productId) =>
     ipcRenderer.invoke("get-stock-movements", productId),
 
+  // FEFO - Control de Vencimientos
+  getExpiringProducts: (days) =>
+    ipcRenderer.invoke("get-expiring-products", { days }),
+
   // Impresión
   printTicket: (data) => ipcRenderer.invoke("print-ticket", data),
 

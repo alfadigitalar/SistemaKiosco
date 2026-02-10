@@ -55,6 +55,13 @@
   "build": {
     "appId": "com.kubopos.app",
     "productName": "Kubo POS",
+    "files": [
+      "app/**/*",
+      "src/main/**/*",
+      "src/preload/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
     "win": {
       "target": "nsis",
       "icon": "build/icon.png"

@@ -80,7 +80,7 @@ async function initDatabase() {
     // MIGRATION: Add measurement_unit to products (Fase 22)
     try {
       db.run(
-        "ALTER TABLE products ADD COLUMN measurement_unit TEXT DEFAULT 'un'"
+        "ALTER TABLE products ADD COLUMN measurement_unit TEXT DEFAULT 'un'",
       );
     } catch (e) {
       // Column likely exists
@@ -96,15 +96,15 @@ async function initDatabase() {
 
     // Default settings
     const existingSettings = db.exec(
-      "SELECT * FROM settings WHERE key = 'kiosk_name'"
+      "SELECT * FROM settings WHERE key = 'kiosk_name'",
     );
     if (!existingSettings.length || !existingSettings[0].values.length) {
       try {
         db.run(
-          "INSERT INTO settings (key, value) VALUES ('kiosk_name', 'Kiosco System')"
+          "INSERT INTO settings (key, value) VALUES ('kiosk_name', 'Kiosco System')",
         );
         db.run(
-          "INSERT INTO settings (key, value) VALUES ('theme_color', 'blue')"
+          "INSERT INTO settings (key, value) VALUES ('theme_color', 'blue')",
         );
       } catch (e) {
         // Ignorar si ya existen
@@ -121,7 +121,7 @@ async function initDatabase() {
     } catch (e) {}
     try {
       db.run(
-        "ALTER TABLE users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
+        "ALTER TABLE users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP",
       );
     } catch (e) {}
 
@@ -182,11 +182,18 @@ async function initDatabase() {
 
     saveDatabase(); // Guardar de nuevo
 
+    // MIGRATION: FEFO - Expiration Date (Control de Vencimientos)
+    try {
+      db.run("ALTER TABLE products ADD COLUMN expiration_date DATE");
+    } catch (e) {}
+
+    saveDatabase();
+
     // DEBUG: Ver columnas de users
     const cols = db.exec("PRAGMA table_info(users)")[0].values;
     console.log(
       "[DB DEBUG] Users Table Columns:",
-      cols.map((c) => c[1])
+      cols.map((c) => c[1]),
     ); // db.exec returns [{columns, values}]
   } catch (error) {
     console.error("Error al inicializar base de datos:", error);

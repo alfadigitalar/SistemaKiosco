@@ -38,7 +38,7 @@ function createWindow() {
     // Abrir DevTools en desarrollo
     win.webContents.openDevTools();
   } else {
-    win.loadFile(path.join(__dirname, "../../dist/index.html"));
+    win.loadFile(path.join(__dirname, "../../app/index.html"));
   }
 
   // Iniciar servidor de escáner local
@@ -113,7 +113,7 @@ app.whenReady().then(() => {
 
       // Cargar HTML
       await printWin.loadURL(
-        `data:text/html;charset=utf-8,${encodeURIComponent(html)}`
+        `data:text/html;charset=utf-8,${encodeURIComponent(html)}`,
       );
 
       // Imprimir
@@ -133,7 +133,7 @@ app.whenReady().then(() => {
               resolve(true);
             }
             printWin.close();
-          }
+          },
         );
       });
     } catch (error) {

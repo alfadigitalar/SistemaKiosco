@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   DollarSign,
   TrendingUp,
   AlertTriangle,
   Calendar,
   ShoppingBag,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 const DashboardScreen = () => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
+  const [expiringCount, setExpiringCount] = useState(0);
 
   // Profit Stats
   const [profitToday, setProfitToday] = useState(null);
@@ -22,6 +25,28 @@ const DashboardScreen = () => {
     return `${year}-${month}-${day}`;
   });
   const [customProfit, setCustomProfit] = useState(null);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const calendarRef = useRef(null);
+
+  // Close calendar on outside click or scroll
+  useEffect(() => {
+    if (!showCalendar) return;
+    const handleClose = (e) => {
+      if (calendarRef.current && !calendarRef.current.contains(e.target)) {
+        setShowCalendar(false);
+      }
+    };
+    const handleScroll = () => setShowCalendar(false);
+    document.addEventListener("mousedown", handleClose);
+    const scrollContainer = document.querySelector(".overflow-y-auto");
+    if (scrollContainer)
+      scrollContainer.addEventListener("scroll", handleScroll);
+    return () => {
+      document.removeEventListener("mousedown", handleClose);
+      if (scrollContainer)
+        scrollContainer.removeEventListener("scroll", handleScroll);
+    };
+  }, [showCalendar]);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -73,6 +98,10 @@ const DashboardScreen = () => {
 
         // Update Custom Date Picker to Local Today
         setCustomDate(todayStr);
+
+        // FEFO: Fetch expiring products count
+        const expiringProducts = await window.api.getExpiringProducts(7);
+        setExpiringCount(expiringProducts?.length || 0);
       } catch (error) {
         console.error("Error cargando dashboard:", error);
       } finally {
@@ -121,7 +150,7 @@ const DashboardScreen = () => {
         <h2 className="text-xl font-bold text-slate-700 dark:text-slate-300 mb-4">
           Resumen General
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Ventas este Mes */}
           <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
             <div className="flex justify-between items-start mb-4">
@@ -159,6 +188,27 @@ const DashboardScreen = () => {
               </div>
             </div>
             <div className="absolute bottom-0 left-0 w-full h-1 bg-amber-500 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
+          </div>
+
+          {/* FEFO: Productos por Vencer */}
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <p className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">
+                  Por Vencer
+                </p>
+                <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                  {expiringCount}{" "}
+                  <span className="text-sm font-normal text-slate-400">
+                    prod.
+                  </span>
+                </h3>
+              </div>
+              <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg text-orange-600 dark:text-orange-400">
+                <Calendar size={20} />
+              </div>
+            </div>
+            <div className="absolute bottom-0 left-0 w-full h-1 bg-orange-500 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
           </div>
 
           {/* Estado General */}
@@ -234,28 +284,177 @@ const DashboardScreen = () => {
           </div>
 
           {/* Calculadora Histórica */}
-          <div className="bg-slate-100 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col justify-center">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-xs font-bold text-slate-500 uppercase">
-                Histórico
-              </span>
-              <input
-                type="date"
-                value={customDate}
-                onChange={(e) => setCustomDate(e.target.value)}
-                className="text-xs p-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded"
-              />
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-visible group hover:shadow-md transition-all border-l-4 border-l-cyan-500">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <p className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">
+                  Histórico
+                </p>
+                <p className="text-sm text-slate-600 dark:text-slate-300 mt-1 font-medium">
+                  {(() => {
+                    const [y, m, d] = customDate.split("-").map(Number);
+                    return new Date(y, m - 1, d).toLocaleDateString("es-AR", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    });
+                  })()}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowCalendar(!showCalendar)}
+                className={`p-2 rounded-lg transition-colors ${
+                  showCalendar
+                    ? "bg-cyan-500 text-white shadow-lg shadow-cyan-500/30"
+                    : "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-200 dark:hover:bg-cyan-900/50"
+                }`}
+              >
+                <Calendar size={20} />
+              </button>
             </div>
-            <div className="text-right">
-              <span className="text-xs text-slate-400 mr-2">Ganancia:</span>
-              <span className="text-lg font-bold text-slate-700 dark:text-white">
+            <div>
+              <span className="text-xs text-slate-400">Ganancia:</span>
+              <h3 className="text-2xl font-black text-cyan-600 dark:text-cyan-400">
                 $
                 {customProfit?.totalProfit?.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
-              </span>
+              </h3>
             </div>
+            <div className="absolute bottom-0 left-0 w-full h-1 bg-cyan-500 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
+
+            {/* Popup Calendar */}
+            {showCalendar && (
+              <>
+                <div
+                  ref={calendarRef}
+                  className="absolute right-0 top-full mt-2 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl shadow-black/20 p-4 w-72"
+                >
+                  {(() => {
+                    const [y, m, d] = customDate.split("-").map(Number);
+                    const viewMonth = m - 1;
+                    const viewYear = y;
+                    const firstOfMonth = new Date(viewYear, viewMonth, 1);
+                    const startDay =
+                      firstOfMonth.getDay() === 0
+                        ? 6
+                        : firstOfMonth.getDay() - 1;
+                    const daysInMonth = new Date(
+                      viewYear,
+                      viewMonth + 1,
+                      0,
+                    ).getDate();
+                    const weeks = [];
+                    let dayCounter = 1 - startDay;
+                    for (let w = 0; w < 6; w++) {
+                      const week = [];
+                      for (let wd = 0; wd < 7; wd++) {
+                        week.push(dayCounter);
+                        dayCounter++;
+                      }
+                      if (week[0] > daysInMonth) break;
+                      weeks.push(week);
+                    }
+                    const prevMonth = () => {
+                      const prev = new Date(viewYear, viewMonth - 1, 1);
+                      setCustomDate(
+                        `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}-01`,
+                      );
+                    };
+                    const nextMonth = () => {
+                      const next = new Date(viewYear, viewMonth + 1, 1);
+                      setCustomDate(
+                        `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-01`,
+                      );
+                    };
+                    const selectDay = (day) => {
+                      setCustomDate(
+                        `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+                      );
+                      setShowCalendar(false);
+                    };
+                    const monthName = firstOfMonth.toLocaleDateString("es-AR", {
+                      month: "long",
+                      year: "numeric",
+                    });
+                    const dayNames = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do"];
+                    const today = new Date();
+                    const isToday = (day) =>
+                      day === today.getDate() &&
+                      viewMonth === today.getMonth() &&
+                      viewYear === today.getFullYear();
+                    const isSelected = (day) =>
+                      day === d && viewMonth === m - 1 && viewYear === y;
+                    return (
+                      <>
+                        <div className="flex items-center justify-between mb-3">
+                          <button
+                            onClick={prevMonth}
+                            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+                          >
+                            <ChevronLeft size={18} />
+                          </button>
+                          <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 capitalize">
+                            {monthName}
+                          </span>
+                          <button
+                            onClick={nextMonth}
+                            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+                          >
+                            <ChevronRight size={18} />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-7 mb-1">
+                          {dayNames.map((dn) => (
+                            <div
+                              key={dn}
+                              className="text-center text-[11px] font-bold text-slate-400 dark:text-slate-500 py-1"
+                            >
+                              {dn}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-7 gap-0.5">
+                          {weeks.map((week, wi) =>
+                            week.map((day, di) => {
+                              const inMonth = day >= 1 && day <= daysInMonth;
+                              return (
+                                <button
+                                  key={`${wi}-${di}`}
+                                  onClick={() => inMonth && selectDay(day)}
+                                  disabled={!inMonth}
+                                  className={`text-xs h-8 w-full rounded-lg transition-all duration-150 font-medium
+                                    ${!inMonth ? "text-transparent cursor-default" : ""}
+                                    ${inMonth && !isSelected(day) && !isToday(day) ? "text-slate-600 dark:text-slate-300 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 hover:text-cyan-600 dark:hover:text-cyan-400 cursor-pointer" : ""}
+                                    ${inMonth && isSelected(day) ? "bg-cyan-500 text-white font-bold shadow-lg shadow-cyan-500/30" : ""}
+                                    ${inMonth && isToday(day) && !isSelected(day) ? "bg-slate-100 dark:bg-slate-700 text-cyan-600 dark:text-cyan-400 font-bold ring-1 ring-cyan-500/30" : ""}
+                                  `}
+                                >
+                                  {inMonth ? day : ""}
+                                </button>
+                              );
+                            }),
+                          )}
+                        </div>
+                        <button
+                          onClick={() => {
+                            const now = new Date();
+                            setCustomDate(
+                              `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
+                            );
+                            setShowCalendar(false);
+                          }}
+                          className="mt-3 w-full text-xs font-semibold text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 py-2 rounded-lg transition-colors border border-slate-100 dark:border-slate-700"
+                        >
+                          Hoy
+                        </button>
+                      </>
+                    );
+                  })()}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

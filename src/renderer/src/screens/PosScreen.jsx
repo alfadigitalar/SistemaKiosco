@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   Printer,
   Mail,
+  Calendar,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -550,6 +551,68 @@ export default function PosScreen() {
         },
       );
       playLowStockSound();
+    }
+
+    // FEFO: Alerta de Vencimiento Próximo
+    if (producto.expiration_date) {
+      const expDate = new Date(producto.expiration_date + "T00:00:00");
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const daysUntil = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
+
+      if (daysUntil < 0) {
+        // Producto VENCIDO
+        toast(
+          (t) => (
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="text-white" size={20} />
+              <span className="font-bold">
+                ¡PRODUCTO VENCIDO! ({expDate.toLocaleDateString("es-AR")})
+              </span>
+            </div>
+          ),
+          {
+            id: `expired-${producto.id}`,
+            style: {
+              background: "#DC2626",
+              color: "#FFFFFF",
+              padding: "12px",
+              borderRadius: "12px",
+              fontWeight: "600",
+              boxShadow: "0 4px 12px rgba(220, 38, 38, 0.3)",
+              border: "1px solid #991B1B",
+            },
+            duration: 5000,
+          },
+        );
+        playLowStockSound();
+      } else if (daysUntil <= 7) {
+        // Próximo a vencer
+        toast(
+          (t) => (
+            <div className="flex items-center gap-2">
+              <Calendar className="text-white" size={20} />
+              <span className="font-bold">
+                Vence en {daysUntil} día{daysUntil !== 1 ? "s" : ""} (
+                {expDate.toLocaleDateString("es-AR")})
+              </span>
+            </div>
+          ),
+          {
+            id: `expiring-${producto.id}`,
+            style: {
+              background: "#F59E0B",
+              color: "#FFFFFF",
+              padding: "12px",
+              borderRadius: "12px",
+              fontWeight: "600",
+              boxShadow: "0 4px 12px rgba(245, 158, 11, 0.3)",
+              border: "1px solid #D97706",
+            },
+            duration: 4000,
+          },
+        );
+      }
     }
 
     setCarrito((prev) => {

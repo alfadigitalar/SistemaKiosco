@@ -8,7 +8,7 @@ export default defineConfig({
   root: "src/renderer",
   publicDir: "public",
   build: {
-    outDir: "../../dist",
+    outDir: "../../app",
     emptyOutDir: true,
   },
   server: {
