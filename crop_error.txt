@@ -1,0 +1,3 @@
+Error: image.writeAsync is not a function
+Stack: TypeError: image.writeAsync is not a function
+    at cropIcon (C:\Users\facun\Desktop\Proyectos Facu\Sistema de Kiosco\scripts\crop_icon.js:17:17)

@@ -26,6 +26,7 @@
     "cross-env": "^10.1.0",
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8",
+    "jimp": "^1.6.0",
     "postcss": "^8.4.49",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

@@ -84,6 +84,10 @@ contextBridge.exposeInMainWorld("api", {
   getSalesHistory: (filters) =>
     ipcRenderer.invoke("get-sales-history", filters),
   getSaleDetails: (saleId) => ipcRenderer.invoke("get-sale-details", saleId),
+
+  // Devoluciones
+  processReturn: (data) => ipcRenderer.invoke("process-return", data),
+
   getAdvancedReport: (filters) =>
     ipcRenderer.invoke("get-advanced-report", filters),
   getAllActivePromos: () => ipcRenderer.invoke("get-all-active-promos"),
@@ -127,6 +131,13 @@ contextBridge.exposeInMainWorld("api", {
   // ARCA (AFIP)
   createElectronicInvoice: (data) =>
     ipcRenderer.invoke("create-electronic-invoice", data),
+
+  // ═══════════════════════════════════════════════════════════
+  // BACKUPS
+  // ═══════════════════════════════════════════════════════════
+  createBackup: () => ipcRenderer.invoke("create-backup"),
+  getBackups: () => ipcRenderer.invoke("get-backups"),
+  restoreBackup: (filename) => ipcRenderer.invoke("restore-backup", filename),
 
   // ═══════════════════════════════════════════════════════════
   // ESCÁNER MÓVIL

@@ -182,10 +182,41 @@ async function initDatabase() {
 
     saveDatabase(); // Guardar de nuevo
 
+    // MIGRATION: Ad-hoc Items (Fase 41 - Item Libre)
+    try {
+      db.run("ALTER TABLE sale_items ADD COLUMN product_name_at_sale TEXT");
+    } catch (e) {}
+
     // MIGRATION: FEFO - Expiration Date (Control de Vencimientos)
     try {
       db.run("ALTER TABLE products ADD COLUMN expiration_date DATE");
     } catch (e) {}
+
+    // MIGRATION: Devoluciones (returns & return_items)
+    try {
+      db.run(`CREATE TABLE IF NOT EXISTS returns (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sale_id INTEGER,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        total_refund REAL NOT NULL,
+        reason TEXT,
+        user_id INTEGER,
+        FOREIGN KEY(sale_id) REFERENCES sales(id),
+        FOREIGN KEY(user_id) REFERENCES users(id)
+      )`);
+      db.run(`CREATE TABLE IF NOT EXISTS return_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        return_id INTEGER NOT NULL,
+        product_id INTEGER NOT NULL,
+        quantity INTEGER NOT NULL,
+        refund_price REAL NOT NULL,
+        subtotal REAL NOT NULL,
+        FOREIGN KEY(return_id) REFERENCES returns(id),
+        FOREIGN KEY(product_id) REFERENCES products(id)
+      )`);
+    } catch (e) {
+      console.warn("[MIGRATION] Error creando tablas de devoluciones:", e);
+    }
 
     saveDatabase();
 

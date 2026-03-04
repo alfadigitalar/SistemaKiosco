@@ -23,7 +23,8 @@ const HistorialScreen = () => {
 
   // Estado para Devoluciones
   const [returnMode, setReturnMode] = useState(false);
-  const [itemsToReturn, setItemsToReturn] = useState({}); // { itemId: quantity }
+  const [itemsToReturn, setItemsToReturn] = useState({}); // { index: quantity }
+  const [moneyOnlyItems, setMoneyOnlyItems] = useState({}); // { index: true } - solo reembolso sin devolver stock
 
   // Cargar ventas (inicialmente carga las últimas 100)
   const fetchHistory = async () => {
@@ -51,6 +52,7 @@ const HistorialScreen = () => {
     setSelectedSale(sale);
     setReturnMode(false); // Reset return mode
     setItemsToReturn({});
+    setMoneyOnlyItems({});
     setLoadingDetails(true);
     setSaleDetails([]);
     try {
@@ -66,17 +68,46 @@ const HistorialScreen = () => {
   const toggleItemReturn = (index, maxQty) => {
     setItemsToReturn((prev) => {
       const newState = { ...prev };
+      if (newState[index] !== undefined) {
+        delete newState[index];
+        // Also remove money-only flag
+        setMoneyOnlyItems((mo) => {
+          const n = { ...mo };
+          delete n[index];
+          return n;
+        });
+      } else {
+        newState[index] = maxQty; // Default to max available
+      }
+      return newState;
+    });
+  };
+
+  const toggleMoneyOnly = (index) => {
+    setMoneyOnlyItems((prev) => {
+      const newState = { ...prev };
       if (newState[index]) {
         delete newState[index];
+        // Reset qty to max
+        const item = saleDetails[index];
+        const remaining = item.quantity - (item.returned_quantity || 0);
+        setItemsToReturn((ir) => ({ ...ir, [index]: remaining }));
       } else {
-        newState[index] = maxQty; // Default to max
+        newState[index] = true;
+        // Set qty to the original sale quantity for refund calc
+        setItemsToReturn((ir) => ({
+          ...ir,
+          [index]: saleDetails[index].quantity,
+        }));
       }
       return newState;
     });
   };
 
   const updateReturnQty = (index, qty, max) => {
-    if (qty < 1) qty = 1;
+    const isMoneyOnly = moneyOnlyItems[index];
+    if (!isMoneyOnly && qty < 1) qty = 1;
+    if (qty < 0) qty = 0;
     if (qty > max) qty = max;
     setItemsToReturn((prev) => ({ ...prev, [index]: qty }));
   };
@@ -85,7 +116,12 @@ const HistorialScreen = () => {
     let total = 0;
     Object.keys(itemsToReturn).forEach((index) => {
       const item = saleDetails[index];
-      total += item.unit_price_at_sale * itemsToReturn[index];
+      if (moneyOnlyItems[index]) {
+        // Money-only: refund full item price × original quantity
+        total += item.unit_price_at_sale * item.quantity;
+      } else {
+        total += item.unit_price_at_sale * itemsToReturn[index];
+      }
     });
     return total;
   };
@@ -102,19 +138,26 @@ const HistorialScreen = () => {
         productId: saleDetails[index].product_id,
         quantity: itemsToReturn[index],
         price: saleDetails[index].unit_price_at_sale,
+        returnStock: !moneyOnlyItems[index], // false = solo reembolso de dinero
       }));
 
-      await window.api.processReturn({
+      const result = await window.api.processReturn({
         saleId: selectedSale.id,
         items: itemsPayload,
         totalRefund: calculateReturnTotal(),
-        userId: 1, // TODO: Get actual current user ID from context/auth
+        userId: JSON.parse(localStorage.getItem("user") || "{}").id || 1,
         reason: "Devolución en Kiosco",
       });
 
-      toast.success("Devolución procesada correctamente", { id: toastId });
-      setSelectedSale(null); // Close modal
-      fetchHistory(); // Refresh lists (optional)
+      if (result && result.success) {
+        toast.success("Devolución procesada correctamente", { id: toastId });
+        setSelectedSale(null); // Close modal
+        fetchHistory(); // Refresh lists
+      } else {
+        toast.error(result?.message || "Error al procesar devolución", {
+          id: toastId,
+        });
+      }
     } catch (error) {
       console.error(error);
       toast.error("Error al procesar devolución", { id: toastId });
@@ -350,51 +393,107 @@ const HistorialScreen = () => {
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                     {saleDetails.map((item, idx) => {
-                      const isSelected = !!itemsToReturn[idx];
+                      const isSelected = itemsToReturn[idx] !== undefined;
+                      const isMoneyOnly = moneyOnlyItems[idx];
+                      const alreadyReturned = item.returned_quantity || 0;
+                      const remaining = item.quantity - alreadyReturned;
+                      const fullyReturned = remaining <= 0;
+                      const canToggle = !fullyReturned || isSelected;
+                      const handleRowClick = () => {
+                        if (!returnMode || !canToggle) return;
+                        toggleItemReturn(
+                          idx,
+                          remaining > 0 ? remaining : item.quantity,
+                        );
+                      };
                       return (
                         <tr
                           key={idx}
-                          className={
-                            isSelected ? "bg-red-50 dark:bg-red-900/10" : ""
-                          }
+                          onClick={handleRowClick}
+                          className={`${
+                            returnMode && canToggle ? "cursor-pointer" : ""
+                          } ${
+                            isSelected
+                              ? isMoneyOnly
+                                ? "bg-amber-50 dark:bg-amber-900/10"
+                                : "bg-red-50 dark:bg-red-900/10"
+                              : fullyReturned
+                                ? "opacity-50"
+                                : returnMode
+                                  ? "hover:bg-slate-50 dark:hover:bg-slate-700/20"
+                                  : ""
+                          }`}
                         >
                           {returnMode && (
                             <td className="py-3">
                               <input
                                 type="checkbox"
                                 checked={isSelected}
-                                onChange={() =>
-                                  toggleItemReturn(idx, item.quantity)
-                                }
-                                className="w-5 h-5 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                                onChange={handleRowClick}
+                                disabled={!canToggle}
+                                className="w-5 h-5 rounded border-slate-300 text-red-600 focus:ring-red-500 disabled:opacity-30 pointer-events-none"
                               />
                             </td>
                           )}
                           <td className="py-3">
-                            <div className="font-medium text-slate-800 dark:text-white">
+                            <div className="font-medium text-slate-800 dark:text-white flex items-center gap-2 flex-wrap">
                               {item.product_name}
+                              {alreadyReturned > 0 && (
+                                <span className="text-[10px] bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-1.5 py-0.5 rounded-full font-semibold">
+                                  Devuelto x{alreadyReturned}
+                                </span>
+                              )}
+                              {fullyReturned && (
+                                <span className="text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-full">
+                                  Todo devuelto
+                                </span>
+                              )}
                             </div>
                             <div className="text-xs text-slate-500 dark:text-slate-500 font-mono">
                               {item.barcode}
                             </div>
+                            {returnMode && isSelected && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleMoneyOnly(idx);
+                                }}
+                                className={`mt-1 text-[10px] px-2 py-0.5 rounded-full font-medium transition-colors ${
+                                  isMoneyOnly
+                                    ? "bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200"
+                                    : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                                }`}
+                              >
+                                {isMoneyOnly
+                                  ? "Solo Reembolso (sin devolver stock)"
+                                  : "Solo Reembolso?"}
+                              </button>
+                            )}
                           </td>
                           <td className="py-3 text-right text-slate-700 dark:text-white">
                             {returnMode && isSelected ? (
-                              <input
-                                type="number"
-                                min="1"
-                                max={item.quantity}
-                                value={itemsToReturn[idx]}
-                                onChange={(e) =>
-                                  updateReturnQty(
-                                    idx,
-                                    parseInt(e.target.value),
-                                    item.quantity
-                                  )
-                                }
-                                className="w-16 p-1 text-center border rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                                onClick={(e) => e.stopPropagation()}
-                              />
+                              isMoneyOnly ? (
+                                <span className="text-amber-600 dark:text-amber-400 text-sm font-medium">
+                                  —
+                                </span>
+                              ) : (
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max={remaining}
+                                  value={itemsToReturn[idx]}
+                                  onChange={(e) =>
+                                    updateReturnQty(
+                                      idx,
+                                      parseInt(e.target.value) || 0,
+                                      remaining,
+                                    )
+                                  }
+                                  className="w-16 p-1 text-center border rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              )
                             ) : (
                               item.quantity
                             )}
@@ -405,9 +504,13 @@ const HistorialScreen = () => {
                           <td className="py-3 text-right font-bold text-slate-800 dark:text-white">
                             $
                             {returnMode && isSelected
-                              ? (
-                                  item.unit_price_at_sale * itemsToReturn[idx]
-                                ).toLocaleString()
+                              ? isMoneyOnly
+                                ? (
+                                    item.unit_price_at_sale * item.quantity
+                                  ).toLocaleString()
+                                : (
+                                    item.unit_price_at_sale * itemsToReturn[idx]
+                                  ).toLocaleString()
                               : item.subtotal.toLocaleString()}
                           </td>
                         </tr>
@@ -438,6 +541,7 @@ const HistorialScreen = () => {
                     onClick={() => {
                       setReturnMode(false);
                       setItemsToReturn({});
+                      setMoneyOnlyItems({});
                     }}
                     className="text-slate-500 hover:text-slate-700 font-medium px-4 py-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors"
                   >

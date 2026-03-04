@@ -12,6 +12,45 @@ async function createInvoice(config, data) {
       keyPath: "HIDDEN",
     });
 
+    // MODO SIMULACIÓN / SANDBOX INTERNO
+    // Si no hay certificados configurados o son "test", simulamos respuesta exitosa
+    if (
+      !config.certPath ||
+      !config.keyPath ||
+      config.certPath === "test" ||
+      config.keyPath === "test"
+    ) {
+      console.log(
+        "[AFIP] MODO SIMULACIÓN ACTIVADO (Sin certificados reales o prueba)",
+      );
+
+      // Simular delay de red
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const pv = parseInt(config.salesPoint) || 1;
+      let tipo = 6; // B
+      if (config.condition === "Monotributo" || config.condition === "Exento")
+        tipo = 11; // C
+
+      // Generar número aleatorio para simular consecutivo
+      // En producción real, esto consultaría el último comprobante, aquí inventamos
+      const fakeNum = Math.floor(Date.now() / 1000) % 1000000;
+
+      // Fecha Vto CAE futura (+10 días)
+      const future = new Date();
+      future.setDate(future.getDate() + 10);
+      const vto = future.toISOString().slice(0, 10).replace(/-/g, "");
+
+      return {
+        success: true,
+        cae: "74365823641284", // CAE Simulado Random
+        caeFchVto: vto,
+        voucherNumber: fakeNum,
+        voucherType: tipo,
+        simulation: true,
+      };
+    }
+
     const afip = new Afip({
       CUIT: parseInt(config.cuit),
       cert: config.certPath,
@@ -21,14 +60,26 @@ async function createInvoice(config, data) {
 
     // Datos básicos
     const puntoVenta = parseInt(config.salesPoint);
-    const tipoComprobante = 6; // Factura B (Para Consumidor Final / Monotributo a CF es 11)
-    // TODO: Parametrizar si es Factura C (11) o B (6)
-    // Por defecto usaremos 6 (B) asumiendo Responsable Inscripto -> Consumidor Final
+    let tipoComprobante = 6; // Default: Factura B
+
+    // Determinar tipo de comprobante según condición del emisor
+    // Monotributo -> Factura C (11)
+    // Responsable Inscripto -> Factura B (6) (o A si el cliente es RI, por ahora B)
+    if (config.condition === "Monotributo" || config.condition === "Exento") {
+      tipoComprobante = 11; // Factura C
+    } else if (config.condition === "Responsable Inscripto") {
+      // TODO: Chequear condición del cliente. Por ahora asumimos CF -> Factura B
+      tipoComprobante = 6; // Factura B
+    }
+
+    console.log(
+      `[AFIP] Condición: ${config.condition} -> Tipo Comprobante: ${tipoComprobante}`,
+    );
 
     // 1. Obtener último número de comprobante
     const lastVoucher = await afip.ElectronicBilling.getLastVoucher(
       puntoVenta,
-      tipoComprobante
+      tipoComprobante,
     );
     const nextVoucher = lastVoucher + 1;
 
@@ -42,44 +93,72 @@ async function createInvoice(config, data) {
       .replace(/-/g, "");
 
     const total = parseFloat(data.total.toFixed(2));
+    let payload = {};
 
-    // Cálculos para Factura B (RI a CF/Exento/Monotributo)
-    // El importe total INCLUYE IVA.
-    // Debemos enviar ImpNeto + ImpIVA = Total.
-    // Asumiendo IVA 21%.
-    const impNeto = parseFloat((total / 1.21).toFixed(2));
-    const impIVA = parseFloat((total - impNeto).toFixed(2));
+    if (tipoComprobante === 11) {
+      // === FACTURA C (Monotributo) ===
+      // No discrimina IVA. ImpTotal = ImpNeto (o se puede usar ImpTotConc para no gravado, pero Monotributo suele ponerlo en Subtotal)
+      // Para Monotributo en WSFE: ImpNeto tiene el total? O ImpTotConc?
+      // Usualmente: ImpTotal = $100 -> ImpSubtotal (Neto) = $100 ? No, ImpNeto y OpEx.
+      // Simplificación para Monotributo: Todo al Neto (o TotConc si no corresponde), IVA 0.
+      // AFIP dice que para CbteTipo 11, ImpNeto + ImpTotConc + ImpOpEx + ImpTrib = ImpTotal.
+      // Usaremos ImpSubtotal en ImpNeto (o veremos si falla sin alicuotas).
+      // Update: Factura C NO lleva array de IVA.
 
-    // Ajuste por redondeo
-    // A veces (Neto + IVA) != Total por un centavo. Ajustamos el IVA para que cuadre exactamente con el Total.
-    const impIVAAdjusted = parseFloat((total - impNeto).toFixed(2));
+      payload = {
+        CantReg: 1,
+        PtoVta: puntoVenta,
+        CbteTipo: tipoComprobante,
+        Concepto: 1, // Productos
+        DocTipo: data.clientDoc ? 80 : 99,
+        DocNro: data.clientDoc || 0,
+        CbteDesde: nextVoucher,
+        CbteHasta: nextVoucher,
+        CbteFch: parseInt(date),
+        ImpTotal: total,
+        ImpTotConc: 0,
+        ImpNeto: total, // Todo al neto en Factura C
+        ImpOpEx: 0,
+        ImpIVA: 0, // Sin IVA
+        ImpTrib: 0,
+        MonId: "PES",
+        MonCotiz: 1,
+        // No Iva array for Factura C
+      };
+    } else {
+      // === FACTURA B (Responsable Inscripto a CF) ===
+      // Discrimina IVA internamente (21%)
+      const impNeto = parseFloat((total / 1.21).toFixed(2));
+      const impIVA = parseFloat((total - impNeto).toFixed(2));
+      const impIVAAdjusted = parseFloat((total - impNeto).toFixed(2));
 
-    const payload = {
-      CantReg: 1, // Cantidad de comprobantes a registrar
-      PtoVta: puntoVenta,
-      CbteTipo: tipoComprobante,
-      Concepto: 1, // 1 = Productos, 2 = Servicios, 3 = Productos y Servicios
-      DocTipo: data.clientDoc ? 80 : 99, // 99 = Consumidor Final, 80 = CUIT
-      DocNro: data.clientDoc || 0,
-      CbteDesde: nextVoucher,
-      CbteHasta: nextVoucher,
-      CbteFch: parseInt(date),
-      ImpTotal: total,
-      ImpTotConc: 0, // Importe neto no gravado
-      ImpNeto: impNeto,
-      ImpOpEx: 0, // Importe exento
-      ImpIVA: impIVAAdjusted,
-      ImpTrib: 0, // Importe tributos
-      MonId: "PES", // Moneda
-      MonCotiz: 1, // Cotización
-      Iva: [
-        {
-          Id: 5, // 5 = 21%
-          BaseImp: impNeto,
-          Importe: impIVAAdjusted,
-        },
-      ],
-    };
+      payload = {
+        CantReg: 1,
+        PtoVta: puntoVenta,
+        CbteTipo: tipoComprobante,
+        Concepto: 1, // Productos
+        DocTipo: data.clientDoc ? 80 : 99,
+        DocNro: data.clientDoc || 0,
+        CbteDesde: nextVoucher,
+        CbteHasta: nextVoucher,
+        CbteFch: parseInt(date),
+        ImpTotal: total,
+        ImpTotConc: 0,
+        ImpNeto: impNeto,
+        ImpOpEx: 0,
+        ImpIVA: impIVAAdjusted,
+        ImpTrib: 0,
+        MonId: "PES",
+        MonCotiz: 1,
+        Iva: [
+          {
+            Id: 5, // 5 = 21%
+            BaseImp: impNeto,
+            Importe: impIVAAdjusted,
+          },
+        ],
+      };
+    }
 
     console.log("[AFIP] Enviando payload:", payload);
 

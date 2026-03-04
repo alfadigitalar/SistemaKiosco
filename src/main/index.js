@@ -68,11 +68,15 @@ app.whenReady().then(() => {
    * Handler para IMPRIMIR TICKET
    * Recibe: { items, total, date, ... }
    */
-  const { generateTicketHTML } = require("./ticketTemplate");
+  const {
+    generateTicketHTML,
+    generateFacturaHTML,
+  } = require("./ticketTemplate");
 
   ipcMain.handle("print-ticket", async (event, ticketData) => {
     try {
       console.log("Printing ticket...", ticketData);
+      const isA4 = ticketData.format === "a4";
 
       // Crear ventana oculta para renderizar el ticket
       const printWin = new BrowserWindow({
@@ -83,16 +87,9 @@ app.whenReady().then(() => {
       });
 
       // Obtener configuración del negocio
-      // La tabla settings es key-value, así que traemos todo y lo mapeamos
-      const { all } = require("./db"); // Importar 'all' si no está disponible, o usar 'get' y cambiar query
+      const { all } = require("./db");
 
-      // Nota: initDatabase expone 'get' en exports, pero aqui index.js trae solo { initDatabase, get }.
-      // Necesitamos 'all' para traer todas las settings.
-      // Si 'all' no se exporta en ./db, hay que ir a db.js y exportarlo.
-      // Revisando imports arriba: const { initDatabase, get } = require("./db");
-      // Asumamos que puedo importar 'all' también.
-
-      const rawSettings = await require("./db").all("SELECT * FROM settings");
+      const rawSettings = await all("SELECT * FROM settings");
       const settings = rawSettings.reduce((acc, row) => {
         acc[row.key] = row.value;
         return acc;
@@ -102,14 +99,44 @@ app.whenReady().then(() => {
       const address = settings.kiosk_address || "Dirección no configurada";
       const logoUrl = settings.ticket_logo || null;
 
-      // Generar HTML
-      const html = generateTicketHTML({
-        storeName,
-        address,
-        logoUrl,
-        footerMessage: "¡Gracias por su compra!",
-        ...ticketData,
-      });
+      // Generar HTML según formato
+      let html;
+      if (isA4) {
+        // Factura formato AFIP
+        html = generateFacturaHTML({
+          storeName: settings.tax_business_name || storeName,
+          address: settings.kiosk_address || "Dirección no configurada",
+          logoUrl,
+          cuit: settings.tax_cuit || "",
+          salesPoint: settings.tax_sales_point || "1",
+          invoiceType: ticketData.invoiceType || "C",
+          condicionIva: settings.tax_condition || "Monotributo",
+          ingresosBrutos: settings.tax_iibb || "",
+          inicioActividades: settings.tax_start_date || "",
+          voucherNumber: ticketData.voucherNumber || 0,
+          cae: ticketData.cae || "",
+          caeFchVto: ticketData.caeFchVto || "",
+          clientName: ticketData.clientName || "Consumidor Final",
+          clientDni: ticketData.clientDni || "",
+          clientAddress: ticketData.clientAddress || "",
+          clientName: ticketData.clientName || "Consumidor Final",
+          clientDni: ticketData.clientDni || "",
+          clientAddress: ticketData.clientAddress || "",
+          clientCondicionIva: ticketData.condicionIva || "Consumidor Final",
+          date: ticketData.date,
+          items: ticketData.items,
+          total: ticketData.total,
+        });
+      } else {
+        // Ticket formato térmico
+        html = generateTicketHTML({
+          storeName,
+          address,
+          logoUrl,
+          footerMessage: "¡Gracias por su compra!",
+          ...ticketData,
+        });
+      }
 
       // Cargar HTML
       await printWin.loadURL(
@@ -117,13 +144,15 @@ app.whenReady().then(() => {
       );
 
       // Imprimir
-      const printers = await printWin.webContents.getPrintersAsync();
-      // Si hay impresoras, imprimir en la default
-      // TODO: Permitir seleccionar impresora en config
+      // Si es A4, permitimos seleccionar impresora (silent: false)
+      // Si es Ticket (default), imprimimos directo (silent: true)
 
       return new Promise((resolve, reject) => {
         printWin.webContents.print(
-          { silent: true, printBackground: false },
+          {
+            silent: !isA4,
+            printBackground: false,
+          },
           (success, errorType) => {
             if (!success) {
               console.error("Print failed:", errorType);

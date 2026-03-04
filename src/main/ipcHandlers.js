@@ -1,4 +1,4 @@
-const { ipcMain, dialog } = require("electron");
+const { ipcMain, dialog, BrowserWindow } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const nodemailer = require("nodemailer");
@@ -378,18 +378,22 @@ function registerIpcHandlers() {
 
       // 2. Insertar items y descontar stock
       for (const item of items) {
-        // Insertar item de venta
+        // Insertar item de venta con nombre guardado
         await run(
-          `INSERT INTO sale_items (sale_id, product_id, quantity, unit_price_at_sale, subtotal)
-           VALUES (?, ?, ?, ?, ?)`,
+          `INSERT INTO sale_items (sale_id, product_id, quantity, unit_price_at_sale, subtotal, product_name_at_sale)
+           VALUES (?, ?, ?, ?, ?, ?)`,
           [
             saleId,
             item.id,
             item.cantidad,
             item.sale_price,
             item.cantidad * item.sale_price,
+            item.name, // Guardar nombre histórico (crucial para Items Libres y cambios de nombre)
           ],
         );
+
+        // Si es item libre (ID -1), NO descontar stock
+        if (item.id === -1) continue;
 
         // Descontar stock del producto (Manejo de Promos)
         // Verificar si es promo
@@ -407,7 +411,7 @@ function registerIpcHandlers() {
           for (const comp of components) {
             // Cantidad a descontar = (qtyComponente * qtyVenta)
             await run(
-              "UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?",
+              "UPDATE products SET stock_quantity = MAX(stock_quantity - ?, 0) WHERE id = ?",
               [comp.quantity * item.cantidad, comp.product_id],
             );
             // Opcional: Registrar movimiento de stock para cada componente (si tuviéramos tabla detallada)
@@ -415,7 +419,7 @@ function registerIpcHandlers() {
         } else {
           // Es producto normal
           await run(
-            `UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?`,
+            `UPDATE products SET stock_quantity = MAX(stock_quantity - ?, 0) WHERE id = ?`,
             [item.cantidad, item.id],
           );
         }
@@ -831,9 +835,19 @@ function registerIpcHandlers() {
           ) as estimatedProfit
         FROM sales s
         WHERE s.timestamp >= ? AND s.timestamp <= ?
-      `; // SQLite uses ISO strings for comparison
+      `;
 
         const summary = await get(summaryQuery, [start, end]);
+
+        // Descontar reembolsos del período
+        const refundQuery = `SELECT COALESCE(SUM(total_refund), 0) as total_refunded FROM returns WHERE timestamp >= ? AND timestamp <= ?`;
+        const refundResult = await get(refundQuery, [start, end]);
+        const refunded = refundResult ? refundResult.total_refunded : 0;
+
+        if (summary) {
+          summary.totalSales = (summary.totalSales || 0) - refunded;
+          summary.estimatedProfit = (summary.estimatedProfit || 0) - refunded;
+        }
 
         // 2. Ventas por Día (Para el Gráfico)
         // Usamos substr para extraer la fecha directamente del timestamp guardado en formato local
@@ -849,30 +863,41 @@ function registerIpcHandlers() {
        `;
         const salesByDay = await all(salesByDayQuery, [start, end]);
 
-        // 3. Top Productos más vendidos en el periodo
+        // 3. Top Productos más vendidos en el periodo (descontando devoluciones)
         const topProductsQuery = `
           SELECT 
             p.name,
-            SUM(si.quantity) as quantity,
-            SUM(si.subtotal) as total
+            SUM(si.quantity) - COALESCE(ret.returned_qty, 0) as quantity,
+            SUM(si.subtotal) - COALESCE(ret.returned_total, 0) as total
           FROM sale_items si
           JOIN sales s ON si.sale_id = s.id
           JOIN products p ON si.product_id = p.id
+          LEFT JOIN (
+            SELECT ri.product_id, SUM(ri.quantity) as returned_qty, SUM(ri.subtotal) as returned_total
+            FROM return_items ri
+            JOIN returns r ON ri.return_id = r.id
+            WHERE r.timestamp >= ? AND r.timestamp <= ?
+            GROUP BY ri.product_id
+          ) ret ON ret.product_id = si.product_id
           WHERE s.timestamp >= ? AND s.timestamp <= ?
           GROUP BY si.product_id
+          HAVING quantity > 0
           ORDER BY quantity DESC
           LIMIT 10
         `;
-        const topProducts = await all(topProductsQuery, [start, end]);
+        const topProducts = await all(topProductsQuery, [
+          start,
+          end,
+          start,
+          end,
+        ]);
 
-        // 4. Top Productos MENOS vendidos (incluyendo 0 ventas)
-        // Usamos LEFT JOIN con un subquery o filtro en el JOIN para no perder productos sin ventas
-        // pero filtrar las ventas por fecha.
+        // 4. Top Productos MENOS vendidos (incluyendo 0 ventas, descontando devoluciones)
         const leastSoldQuery = `
           SELECT 
             p.name,
-            COALESCE(SUM(filtered_sales.quantity), 0) as quantity,
-            COALESCE(SUM(filtered_sales.subtotal), 0) as total
+            COALESCE(SUM(filtered_sales.quantity), 0) - COALESCE(ret.returned_qty, 0) as quantity,
+            COALESCE(SUM(filtered_sales.subtotal), 0) - COALESCE(ret.returned_total, 0) as total
           FROM products p
           LEFT JOIN (
             SELECT si.product_id, si.quantity, si.subtotal
@@ -880,12 +905,24 @@ function registerIpcHandlers() {
             JOIN sales s ON si.sale_id = s.id
             WHERE s.timestamp >= ? AND s.timestamp <= ?
           ) filtered_sales ON p.id = filtered_sales.product_id
+          LEFT JOIN (
+            SELECT ri.product_id, SUM(ri.quantity) as returned_qty, SUM(ri.subtotal) as returned_total
+            FROM return_items ri
+            JOIN returns r ON ri.return_id = r.id
+            WHERE r.timestamp >= ? AND r.timestamp <= ?
+            GROUP BY ri.product_id
+          ) ret ON ret.product_id = p.id
           WHERE p.is_active = 1
           GROUP BY p.id
           ORDER BY quantity ASC, total ASC
           LIMIT 10
         `;
-        const leastSoldProducts = await all(leastSoldQuery, [start, end]);
+        const leastSoldProducts = await all(leastSoldQuery, [
+          start,
+          end,
+          start,
+          end,
+        ]);
 
         return {
           summary: {
@@ -912,28 +949,40 @@ function registerIpcHandlers() {
   ipcMain.handle("process-return", async (event, returnData) => {
     try {
       const { items, totalRefund, saleId, userId, reason } = returnData;
+      console.log("[RETURN] Procesando devolución:", {
+        saleId,
+        totalRefund,
+        itemCount: items?.length,
+        userId,
+      });
 
-      await run("BEGIN TRANSACTION");
-
-      // 1. Registrar devolución
+      // 1. Registrar devolución (sin transacciones, sql.js guarda en cada run())
       const result = await run(
         "INSERT INTO returns (sale_id, total_refund, reason, user_id) VALUES (?, ?, ?, ?)",
         [saleId, totalRefund, reason || "Devolución", userId],
       );
-      // 'run' en db.js devuelve Changes info, pero necesitamos el ID.
-      // sql.js devuelve el lastInsertId en el result object si modificamos db.js,
-      // pero por defecto db.js wrapper devuelve algo?
-      // Revisé db.js y devuelve: return db.prepare(sql).run(params); (o similar).
-      // better-sqlite3 style: result.lastInsertRowid.
-      // sql.js 'run' returns nothing useful directly usually, but let's check db.js implementation.
-      // Si db.js usa db.run(sql, params), sql.js no devuelve el ID ahí.
-      // Necesito 'select last_insert_rowid()'.
 
-      const idResult = await get("SELECT last_insert_rowid() as id");
-      const returnId = idResult.id;
+      const returnId = result.lastId;
+      console.log("[RETURN] Return registrado con ID:", returnId);
+
+      if (!returnId) {
+        console.error("[RETURN] No se pudo obtener el ID de la devolución");
+        return {
+          success: false,
+          message: "Error interno: no se obtuvo ID de devolución",
+        };
+      }
 
       // 2. Procesar Items
       for (const item of items) {
+        const shouldReturnStock = item.returnStock !== false; // default true
+        console.log("[RETURN] Procesando item:", {
+          productId: item.productId,
+          qty: item.quantity,
+          price: item.price,
+          returnStock: shouldReturnStock,
+        });
+
         // a. Registrar item de devolución
         await run(
           "INSERT INTO return_items (return_id, product_id, quantity, refund_price, subtotal) VALUES (?, ?, ?, ?, ?)",
@@ -946,38 +995,34 @@ function registerIpcHandlers() {
           ],
         );
 
-        // b. Devolver Stock
-        await run(
-          "UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?",
-          [item.quantity, item.productId],
-        );
+        // b. Devolver Stock (solo si returnStock es true)
+        if (shouldReturnStock && item.quantity > 0) {
+          await run(
+            "UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?",
+            [item.quantity, item.productId],
+          );
 
-        // c. Registrar Movimiento de Stock
-        await run(
-          "INSERT INTO stock_movements (product_id, type, quantity, reason, user_id) VALUES (?, 'return', ?, ?, ?)",
-          [
-            item.productId,
-            item.quantity,
-            `Devolución Ticket #${saleId}`,
-            userId,
-          ],
-        );
+          // c. Registrar Movimiento de Stock
+          await run(
+            "INSERT INTO stock_movements (product_id, type, quantity, reason, user_id) VALUES (?, 'return', ?, ?, ?)",
+            [
+              item.productId,
+              item.quantity,
+              `Devolución Ticket #${saleId}`,
+              userId,
+            ],
+          );
+        }
       }
 
-      // 3. Registrar Salida de Caja (Refund)
-      // Solo si el monto es > 0
-      if (totalRefund > 0) {
-        await run(
-          "INSERT INTO movements (type, amount, description, user_id) VALUES ('withdrawal', ?, ?, ?)",
-          [totalRefund, `Reembolso Devolución Ticket #${saleId}`, userId],
-        );
-      }
+      // 3. Registrar Salida de Caja (Refund) - Opcional
+      // Nota: Se registra el movimiento de stock pero no hay tabla de caja separada por ahora
+      // El reembolso queda registrado en la tabla 'returns' con el monto total
 
-      await run("COMMIT");
+      console.log("[RETURN] Devolución completada exitosamente, ID:", returnId);
       return { success: true, returnId };
     } catch (error) {
-      await run("ROLLBACK");
-      console.error("Error processing return:", error);
+      console.error("[RETURN] Error processing return:", error);
       return { success: false, message: error.message };
     }
   });
@@ -1018,10 +1063,11 @@ function registerIpcHandlers() {
     }
   });
 
-  // Obtener estadísticas de ganancias (Real Profit)
+  // Obtener estadísticas de ganancias (Real Profit - descontando devoluciones)
   ipcMain.handle("get-profit-stats", async (event, { startDate, endDate }) => {
     try {
-      let query = `
+      // Calcular ventas brutas
+      let salesQuery = `
         SELECT 
           SUM((si.unit_price_at_sale - COALESCE(p.cost_price, 0)) * si.quantity) as total_profit,
           SUM(si.unit_price_at_sale * si.quantity) as total_revenue,
@@ -1032,24 +1078,53 @@ function registerIpcHandlers() {
         WHERE 1=1
       `;
 
-      const params = [];
+      const salesParams = [];
 
       if (startDate) {
-        // SQLite string comparison works for ISO dates
-        query += " AND s.timestamp >= ?";
-        params.push(startDate + " 00:00:00");
+        salesQuery += " AND s.timestamp >= ?";
+        salesParams.push(startDate + " 00:00:00");
       }
       if (endDate) {
-        query += " AND s.timestamp <= ?";
-        params.push(endDate + " 23:59:59");
+        salesQuery += " AND s.timestamp <= ?";
+        salesParams.push(endDate + " 23:59:59");
       }
 
-      const result = await get(query, params);
-      // Ensure we return numbers, not nulls
+      const salesResult = await get(salesQuery, salesParams);
+
+      // Calcular total reembolsado
+      let refundQuery = `
+        SELECT COALESCE(SUM(total_refund), 0) as total_refunded
+        FROM returns
+        WHERE 1=1
+      `;
+      const refundParams = [];
+
+      if (startDate) {
+        refundQuery += " AND timestamp >= ?";
+        refundParams.push(startDate + " 00:00:00");
+      }
+      if (endDate) {
+        refundQuery += " AND timestamp <= ?";
+        refundParams.push(endDate + " 23:59:59");
+      }
+
+      const refundResult = await get(refundQuery, refundParams);
+      const refunded = refundResult ? refundResult.total_refunded : 0;
+
+      const grossRevenue =
+        salesResult && salesResult.total_revenue
+          ? salesResult.total_revenue
+          : 0;
+      const grossProfit =
+        salesResult && salesResult.total_profit ? salesResult.total_profit : 0;
+      const totalCost =
+        salesResult && salesResult.total_cost ? salesResult.total_cost : 0;
+
       return {
-        totalProfit: result && result.total_profit ? result.total_profit : 0,
-        totalRevenue: result && result.total_revenue ? result.total_revenue : 0,
-        totalCost: result && result.total_cost ? result.total_cost : 0,
+        totalProfit: grossProfit - refunded,
+        totalRevenue: grossRevenue - refunded,
+        totalCost: totalCost,
+        totalRefunded: refunded,
       };
     } catch (error) {
       console.error("Error al obtener ganancias:", error);
@@ -1057,14 +1132,21 @@ function registerIpcHandlers() {
     }
   });
 
-  // Obtener detalle de una venta
+  // Obtener detalle de una venta (con info de devoluciones)
   ipcMain.handle("get-sale-details", async (event, saleId) => {
     try {
       const items = await all(
         `
-            SELECT si.*, p.name as product_name, p.barcode
+            SELECT si.*, p.name as product_name, p.barcode,
+                   COALESCE(ri_agg.returned_qty, 0) as returned_quantity
             FROM sale_items si
             LEFT JOIN products p ON si.product_id = p.id
+            LEFT JOIN (
+              SELECT ri.product_id, r.sale_id, SUM(ri.quantity) as returned_qty
+              FROM return_items ri
+              JOIN returns r ON ri.return_id = r.id
+              GROUP BY ri.product_id, r.sale_id
+            ) ri_agg ON ri_agg.product_id = si.product_id AND ri_agg.sale_id = si.sale_id
             WHERE si.sale_id = ?
           `,
         [saleId],
@@ -1135,6 +1217,7 @@ function registerIpcHandlers() {
   });
 
   // ═══════════════════════════════════════════════════════════
+
   // HANDLERS DE CONFIGURACIÓN
   // ═══════════════════════════════════════════════════════════
 
@@ -1387,10 +1470,12 @@ function registerIpcHandlers() {
         operator = "-";
       }
 
-      await run(
-        `UPDATE products SET stock_quantity = stock_quantity ${operator} ? WHERE id = ?`,
-        [quantity, product_id],
-      );
+      const clampedQuery =
+        operator === "-"
+          ? `UPDATE products SET stock_quantity = MAX(stock_quantity - ?, 0) WHERE id = ?`
+          : `UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?`;
+
+      await run(clampedQuery, [quantity, product_id]);
 
       return { success: true };
     } catch (error) {
@@ -1503,7 +1588,7 @@ function registerIpcHandlers() {
       try {
         // 1. Obtener configuración
         const settingsRows = await all(
-          "SELECT key, value FROM settings WHERE key IN ('tax_enabled', 'tax_cuit', 'tax_sales_point', 'tax_cert_path', 'tax_key_path')",
+          "SELECT key, value FROM settings WHERE key IN ('tax_enabled', 'tax_cuit', 'tax_sales_point', 'tax_cert_path', 'tax_key_path', 'tax_business_name', 'tax_iibb', 'tax_start_date', 'tax_condition')",
         );
         const config = {};
         settingsRows.forEach((row) => (config[row.key] = row.value));
@@ -1517,12 +1602,7 @@ function registerIpcHandlers() {
         }
 
         // Validar datos mínimos
-        if (
-          !config.tax_cuit ||
-          !config.tax_sales_point ||
-          !config.tax_cert_path ||
-          !config.tax_key_path
-        ) {
+        if (!config.tax_cuit || !config.tax_sales_point) {
           return {
             success: false,
             message: "Faltan datos de configuración de AFIP",
@@ -1534,6 +1614,10 @@ function registerIpcHandlers() {
           salesPoint: config.tax_sales_point,
           certPath: config.tax_cert_path,
           keyPath: config.tax_key_path,
+          businessName: config.tax_business_name,
+          iibb: config.tax_iibb,
+          startDate: config.tax_start_date,
+          condition: config.tax_condition,
         };
 
         // 2. Llamar Servicio
@@ -1569,25 +1653,92 @@ function registerIpcHandlers() {
     },
   );
 
+  // Handler para ENVIAR TICKET POR EMAIL (PDF)
   ipcMain.handle(
     "send-email-ticket",
-    async (event, { email, subject, ticketData, pdfBuffer }) => {
+    async (event, { email, subject, ticketData }) => {
       try {
+        console.log("Sending email to:", email);
+
         // 1. Obtener Configuración SMTP
+        console.log("[EMAIL] Obteniendo configuración...");
         const settings = await all(
-          "SELECT * FROM settings WHERE key LIKE 'smtp_%'",
+          "SELECT key, value FROM settings WHERE key IN ('smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'kiosk_name', 'tax_business_name', 'kiosk_address', 'tax_cuit', 'tax_sales_point', 'tax_condition', 'tax_iibb', 'tax_start_date')",
         );
         const config = {};
-        settings.forEach((s) => (config[s.key] = s.value));
+        settings.forEach((row) => (config[row.key] = row.value));
 
         if (!config.smtp_host || !config.smtp_user || !config.smtp_pass) {
-          return {
-            success: false,
-            message: "Falta configurar SMTP en Configuración",
-          };
+          console.error("[EMAIL] SMTP Faltante");
+          return { success: false, message: "SMTP no configurado" };
         }
 
-        // 2. Configurar Transporter
+        // 2. Generar HTML (Mismo que para imprimir)
+        console.log("[EMAIL] Generando HTML...");
+        const { generateFacturaHTML } = require("./ticketTemplate");
+
+        // Completamos info del negocio si no viene en ticketData
+        const storeName =
+          config.tax_business_name || config.kiosk_name || "MI KIOSCO";
+        const address = config.kiosk_address || "";
+        const cuit = config.tax_cuit || "";
+        const salesPoint = config.tax_sales_point || "1";
+        const condicionIva = config.tax_condition || "Responsable Inscripto";
+
+        // aseguramos que ticketData tenga los datos fiscales correctos
+        const fullTicketData = {
+          ...ticketData,
+          storeName,
+          address,
+          cuit,
+          salesPoint,
+          condicionIva,
+          ingresosBrutos: config.tax_iibb || "",
+          inicioActividades: config.tax_start_date || "",
+          format: "a4", // Forzamos A4 para email
+        };
+
+        // Forzar tipo C si es Monotributo o Exento (override frontend)
+        if (condicionIva === "Monotributo" || condicionIva === "Exento") {
+          fullTicketData.invoiceType = "C";
+        }
+
+        const html = generateFacturaHTML(fullTicketData);
+        console.log("[EMAIL] HTML Generado. Creando ventana...");
+
+        // 3. Generar PDF usando Electron (printToPDF)
+        const pdfWin = new BrowserWindow({
+          show: false,
+          webPreferences: { nodeIntegration: true },
+        });
+
+        await pdfWin.loadURL(
+          `data:text/html;charset=utf-8,${encodeURIComponent(html)}`,
+        );
+
+        const pdfBuffer = await pdfWin.webContents.printToPDF({
+          printBackground: true,
+          pageSize: "A4",
+          margins: { top: 0, bottom: 0, left: 0, right: 0 },
+        });
+
+        console.log(
+          "PDF generated, size:",
+          pdfBuffer ? pdfBuffer.length : "undefined",
+        );
+
+        if (!pdfBuffer) {
+          throw new Error("Error generating PDF: Buffer is empty or undefined");
+        }
+
+        console.log("[EMAIL] Convirtiendo Buffer...");
+        const finalBuffer = Buffer.from(pdfBuffer);
+        console.log("[EMAIL] Buffer final listo. Tamaño:", finalBuffer.length);
+
+        pdfWin.close();
+
+        // 4. Enviar Email con Nodemailer
+        console.log("[EMAIL] Configurando Nodemailer...");
         const transporter = nodemailer.createTransport({
           host: config.smtp_host,
           port: parseInt(config.smtp_port) || 587,
@@ -1596,26 +1747,33 @@ function registerIpcHandlers() {
             user: config.smtp_user,
             pass: config.smtp_pass,
           },
+          tls: {
+            rejectUnauthorized: false,
+          },
         });
 
-        // 3. Enviar Email
-        await transporter.sendMail({
-          from: `"Novy POS" <${config.smtp_user}>`,
+        console.log("[EMAIL] Enviando...");
+        const info = await transporter.sendMail({
+          from: `"${storeName}" <${config.smtp_user}>`,
           to: email,
-          subject: subject || "Su Ticket de Compra",
-          text: "Adjunto encontrará su comprobante de compra. Gracias por su preferencia!",
+          subject: subject || `Factura de Compra - ${storeName}`,
+          text: `Adjunto encontrarás tu factura de compra.\n\nGracias por elegirnos.\n${storeName}`,
           attachments: [
             {
-              filename: `Ticket_${Date.now()}.pdf`,
-              content: Buffer.from(pdfBuffer), // pdfBuffer viene como ArrayBuffer o Uint8Array desde Renderer
+              filename: `Factura_${fullTicketData.voucherNumber || "0"}.pdf`,
+              content: finalBuffer,
             },
           ],
         });
 
+        console.log("Email sent:", info.messageId);
         return { success: true };
       } catch (error) {
-        console.error("Error enviando email:", error);
-        return { success: false, message: error.message };
+        console.error("Error sending email:", error);
+        return {
+          success: false,
+          message: error.message + (error.stack ? "\n" + error.stack : ""),
+        };
       }
     },
   );
@@ -1624,58 +1782,103 @@ function registerIpcHandlers() {
   // HANDLERS DE BACKUP
   // ═══════════════════════════════════════════════════════════
 
-  const BACKUP_DIR = path.join(
-    require("electron").app.getPath("userData"),
-    "backups",
-  );
-  if (!fs.existsSync(BACKUP_DIR)) {
-    fs.mkdirSync(BACKUP_DIR);
-  }
-
   // Crear Backup
   ipcMain.handle("create-backup", async () => {
     try {
       const { app } = require("electron");
       const isDev = process.env.NODE_ENV === "development";
-      const dbPath = isDev
-        ? path.join(__dirname, "../../novy.sqlite")
-        : path.join(app.getPath("userData"), "novy.sqlite");
 
-      if (!fs.existsSync(dbPath)) {
-        return { success: false, message: "No database found to backup" };
+      // Definir rutas dentro del handler para asegurar que app está listo
+      const userDataPath = app.getPath("userData");
+      const BACKUP_DIR = path.join(userDataPath, "backups");
+
+      // Crear directorio si no existe
+      if (!fs.existsSync(BACKUP_DIR)) {
+        console.log(`[BACKUP] Creando directorio: ${BACKUP_DIR}`);
+        fs.mkdirSync(BACKUP_DIR, { recursive: true });
       }
 
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const dbPath = isDev
+        ? path.join(__dirname, "../../novy.sqlite")
+        : path.join(userDataPath, "novy.sqlite");
+
+      console.log(`[BACKUP] Intentando backup de: ${dbPath}`);
+
+      if (!fs.existsSync(dbPath)) {
+        console.error(
+          `[BACKUP] Error: No se encontró la base de datos en ${dbPath}`,
+        );
+        return {
+          success: false,
+          message: `Base de datos no encontrada en: ${dbPath}`,
+        };
+      }
+
+      // Nombre del archivo con fecha local para mejor legibilidad
+      const now = new Date();
+      const timestamp =
+        now.getFullYear() +
+        "-" +
+        String(now.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(now.getDate()).padStart(2, "0") +
+        "_" +
+        String(now.getHours()).padStart(2, "0") +
+        "-" +
+        String(now.getMinutes()).padStart(2, "0") +
+        "-" +
+        String(now.getSeconds()).padStart(2, "0");
+
       const backupName = `backup_${timestamp}.sqlite`;
       const backupPath = path.join(BACKUP_DIR, backupName);
 
+      console.log(`[BACKUP] Copiando a: ${backupPath}`);
       fs.copyFileSync(dbPath, backupPath);
 
-      // Clean old backups (keep last 10)
-      const files = fs
-        .readdirSync(BACKUP_DIR)
-        .filter((f) => f.startsWith("backup_") && f.endsWith(".sqlite"))
-        .sort((a, b) => {
-          return (
-            fs.statSync(path.join(BACKUP_DIR, b)).mtime.getTime() -
-            fs.statSync(path.join(BACKUP_DIR, a)).mtime.getTime()
-          );
-        });
+      // Limpieza de backups antiguos (Mantener últimos 10)
+      try {
+        const files = fs
+          .readdirSync(BACKUP_DIR)
+          .filter((f) => f.startsWith("backup_") && f.endsWith(".sqlite"))
+          .map((f) => ({
+            name: f,
+            path: path.join(BACKUP_DIR, f),
+            time: fs.statSync(path.join(BACKUP_DIR, f)).mtime.getTime(),
+          }))
+          .sort((a, b) => b.time - a.time); // Más nuevos primero
 
-      if (files.length > 10) {
-        files.slice(10).forEach((f) => fs.unlinkSync(path.join(BACKUP_DIR, f)));
+        if (files.length > 10) {
+          const toDelete = files.slice(10);
+          toDelete.forEach((f) => {
+            console.log(`[BACKUP] Eliminando backup antiguo: ${f.name}`);
+            fs.unlinkSync(f.path);
+          });
+        }
+      } catch (cleanError) {
+        console.warn(
+          "[BACKUP] Error limpiando backups antiguos (no crítico):",
+          cleanError,
+        );
       }
 
       return { success: true, path: backupPath };
     } catch (error) {
-      console.error("Backup error:", error);
+      console.error("[BACKUP] Error fatal:", error);
       return { success: false, message: error.message };
     }
   });
 
   // Listar Backups
-  ipcMain.handle("list-backups", async () => {
+  ipcMain.handle("get-backups", async () => {
     try {
+      const { app } = require("electron");
+      const userDataPath = app.getPath("userData");
+      const BACKUP_DIR = path.join(userDataPath, "backups");
+
+      if (!fs.existsSync(BACKUP_DIR)) {
+        return { success: true, backups: [] };
+      }
+
       const files = fs
         .readdirSync(BACKUP_DIR)
         .filter((f) => f.startsWith("backup_") && f.endsWith(".sqlite"))
@@ -1699,6 +1902,9 @@ function registerIpcHandlers() {
   ipcMain.handle("restore-backup", async (event, backupFileName) => {
     try {
       const { app } = require("electron");
+      const userDataPath = app.getPath("userData");
+      const BACKUP_DIR = path.join(userDataPath, "backups");
+
       const isDev = process.env.NODE_ENV === "development";
       const dbPath = isDev
         ? path.join(__dirname, "../../novy.sqlite")

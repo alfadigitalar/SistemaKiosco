@@ -17,6 +17,10 @@ export const ConfigProvider = ({ children }) => {
   const [taxSalesPoint, setTaxSalesPoint] = useState("");
   const [taxCertPath, setTaxCertPath] = useState("");
   const [taxKeyPath, setTaxKeyPath] = useState("");
+  const [taxBusinessName, setTaxBusinessName] = useState("");
+  const [taxIibb, setTaxIibb] = useState("");
+  const [taxStartDate, setTaxStartDate] = useState("");
+  const [taxCondition, setTaxCondition] = useState("Monotributo");
 
   // Mapa de colores para Tailwind (se usará para clases dinámicas manualmente)
   // bg-blue-600, text-blue-400, border-blue-500, etc.
@@ -38,6 +42,11 @@ export const ConfigProvider = ({ children }) => {
           setTaxSalesPoint(settings.tax_sales_point);
         if (settings.tax_cert_path) setTaxCertPath(settings.tax_cert_path);
         if (settings.tax_key_path) setTaxKeyPath(settings.tax_key_path);
+        if (settings.tax_business_name)
+          setTaxBusinessName(settings.tax_business_name);
+        if (settings.tax_iibb) setTaxIibb(settings.tax_iibb);
+        if (settings.tax_start_date) setTaxStartDate(settings.tax_start_date);
+        if (settings.tax_condition) setTaxCondition(settings.tax_condition);
       }
     } catch (error) {
       console.error("Error loading settings:", error);
@@ -108,6 +117,13 @@ export const ConfigProvider = ({ children }) => {
         setTaxCertPath(newSettings.tax_cert_path);
       if (newSettings.tax_key_path !== undefined)
         setTaxKeyPath(newSettings.tax_key_path);
+      if (newSettings.tax_business_name !== undefined)
+        setTaxBusinessName(newSettings.tax_business_name);
+      if (newSettings.tax_iibb !== undefined) setTaxIibb(newSettings.tax_iibb);
+      if (newSettings.tax_start_date !== undefined)
+        setTaxStartDate(newSettings.tax_start_date);
+      if (newSettings.tax_condition !== undefined)
+        setTaxCondition(newSettings.tax_condition);
 
       // Toast handled by component or here, let's return true for component handling
       return true;
@@ -231,6 +247,10 @@ export const ConfigProvider = ({ children }) => {
         taxSalesPoint,
         taxCertPath,
         taxKeyPath,
+        taxBusinessName,
+        taxIibb,
+        taxStartDate,
+        taxCondition,
       }}
     >
       {children}

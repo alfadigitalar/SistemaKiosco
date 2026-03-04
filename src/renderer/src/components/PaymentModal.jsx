@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
-const PaymentModal = ({ isOpen, onClose, total, onConfirm }) => {
+const PaymentModal = ({ isOpen, onClose, total, onConfirm, clientName }) => {
   const [metodo, setMetodo] = useState("efectivo");
   const [montoRecibido, setMontoRecibido] = useState("");
   const [montoEfectivo, setMontoEfectivo] = useState("");
@@ -28,9 +28,13 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm }) => {
     }
   }, [isOpen]);
 
-  // Set default amount for card/mp when selected
+  // Set default amount for card/mp/checking when selected
   useEffect(() => {
-    if (metodo === "tarjeta" || metodo === "mercadopago") {
+    if (
+      metodo === "tarjeta" ||
+      metodo === "mercadopago" ||
+      metodo === "checking_account"
+    ) {
       setMontoRecibido(total.toString());
     }
   }, [metodo, total]);
@@ -44,7 +48,7 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm }) => {
         (parseFloat(montoEfectivo) || 0) + (parseFloat(montoTarjeta) || 0);
       return Math.abs(totalIngresado - total) < 0.1; // Margin for float errors
     }
-    return true; // Tarjeta / MP assumed full payment
+    return true; // Tarjeta / MP / Cta Cte assumed full payment
   };
 
   const procesarPago = async () => {
@@ -66,6 +70,9 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm }) => {
     } else if (metodo === "mercadopago") {
       datosPago.monto = total;
       datosPago.mercadopago = true;
+    } else if (metodo === "checking_account") {
+      datosPago.monto = total;
+      datosPago.checking_account = true;
     } else if (metodo === "mixto") {
       datosPago.monto = total;
       datosPago.efectivo = parseFloat(montoEfectivo) || 0;
@@ -180,6 +187,26 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm }) => {
                 Mercado Pago
               </span>
             </button>
+            {clientName && (
+              <button
+                onClick={() => setMetodo("checking_account")}
+                className={`p-3 sm:p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition border-2 col-span-2 ${
+                  metodo === "checking_account"
+                    ? "bg-orange-600/20 border-orange-500 text-orange-400"
+                    : "bg-slate-700/50 border-transparent text-slate-400 hover:bg-slate-700 hover:text-white"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <AlertTriangle size={20} className="sm:w-6 sm:h-6" />
+                  <span className="font-bold text-sm sm:text-base">
+                    Fiado / Cta. Cte.
+                  </span>
+                </div>
+                <span className="text-xs opacity-75">
+                  Asignar a: {clientName}
+                </span>
+              </button>
+            )}
           </div>
 
           <div className="min-h-[100px]">
@@ -231,6 +258,23 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm }) => {
                 <p className="text-slate-300 text-sm sm:text-base">
                   Solicite o muestre el QR por <b>${total.toFixed(2)}</b>.
                 </p>
+              </div>
+            )}
+
+            {metodo === "checking_account" && (
+              <div className="flex flex-col items-center justify-center h-full text-center space-y-4 py-4">
+                <div className="w-16 h-16 rounded-full bg-orange-900/30 flex items-center justify-center text-orange-400">
+                  <AlertTriangle size={32} />
+                </div>
+                <div className="text-slate-300 text-sm sm:text-base">
+                  <p>Se registrará una deuda de</p>
+                  <p className="text-2xl font-bold text-white my-2">
+                    ${total.toFixed(2)}
+                  </p>
+                  <p>
+                    a la cuenta de <b>{clientName}</b>
+                  </p>
+                </div>
               </div>
             )}
 

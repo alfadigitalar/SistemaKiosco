@@ -18,6 +18,7 @@ import {
   Settings,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import ConfirmationModal from "../components/ConfirmationModal";
 
 const ConfiguracionScreen = () => {
   const {
@@ -37,6 +38,10 @@ const ConfiguracionScreen = () => {
   const [selectedMode, setSelectedMode] = useState(themeMode);
   const [backups, setBackups] = useState([]);
 
+  // State for Restore Modal
+  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
+  const [backupToRestore, setBackupToRestore] = useState(null);
+
   // State for Logo
   const [ticketLogo, setTicketLogo] = useState(null);
 
@@ -47,13 +52,26 @@ const ConfiguracionScreen = () => {
   const [smtpPass, setSmtpPass] = useState("");
 
   // State for Tax (ARCA)
-  const { taxEnabled, taxCuit, taxSalesPoint, taxCertPath, taxKeyPath } =
-    useConfig();
+  const {
+    taxEnabled,
+    taxCuit,
+    taxSalesPoint,
+    taxCertPath,
+    taxKeyPath,
+    taxBusinessName,
+    taxIibb,
+    taxStartDate,
+    taxCondition,
+  } = useConfig();
   const [taxEnabledLocal, setTaxEnabledLocal] = useState(false);
   const [taxCuitLocal, setTaxCuitLocal] = useState("");
   const [taxSalesPointLocal, setTaxSalesPointLocal] = useState("");
   const [taxCertPathLocal, setTaxCertPathLocal] = useState("");
   const [taxKeyPathLocal, setTaxKeyPathLocal] = useState("");
+  const [taxBusinessNameLocal, setTaxBusinessNameLocal] = useState("");
+  const [taxIibbLocal, setTaxIibbLocal] = useState("");
+  const [taxStartDateLocal, setTaxStartDateLocal] = useState("");
+  const [taxConditionLocal, setTaxConditionLocal] = useState("Monotributo");
 
   // Estado para gestión de usuario
   const [currentUser, setCurrentUser] = useState({});
@@ -113,6 +131,10 @@ const ConfiguracionScreen = () => {
     setTaxSalesPointLocal(taxSalesPoint || "");
     setTaxCertPathLocal(taxCertPath || "");
     setTaxKeyPathLocal(taxKeyPath || "");
+    setTaxBusinessNameLocal(taxBusinessName || "");
+    setTaxIibbLocal(taxIibb || "");
+    setTaxStartDateLocal(taxStartDate || "");
+    setTaxConditionLocal(taxCondition || "Monotributo");
   }, [
     kioskName,
     kioskAddress,
@@ -123,11 +145,15 @@ const ConfiguracionScreen = () => {
     taxSalesPoint,
     taxCertPath,
     taxKeyPath,
+    taxBusinessName,
+    taxIibb,
+    taxStartDate,
+    taxCondition,
   ]);
 
   const loadBackups = async () => {
     try {
-      const res = await window.api.invoke("get-backups");
+      const res = await window.api.getBackups();
       if (res && res.success) {
         setBackups(res.backups || []);
       }
@@ -170,6 +196,10 @@ const ConfiguracionScreen = () => {
         tax_sales_point: taxSalesPointLocal,
         tax_cert_path: taxCertPathLocal,
         tax_key_path: taxKeyPathLocal,
+        tax_business_name: taxBusinessNameLocal,
+        tax_iibb: taxIibbLocal,
+        tax_start_date: taxStartDateLocal,
+        tax_condition: taxConditionLocal,
       });
 
       // 2. Guardar Perfil Usuario
@@ -543,6 +573,65 @@ const ConfiguracionScreen = () => {
                       />
                     </div>
 
+                    {/* Nuevos Campos Fiscales */}
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-2">
+                        Razón Social (Para Factura)
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+                        value={taxBusinessNameLocal}
+                        onChange={(e) =>
+                          setTaxBusinessNameLocal(e.target.value)
+                        }
+                        placeholder="Ej: Juan Perez S.A."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-2">
+                        Condición frente al IVA
+                      </label>
+                      <select
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+                        value={taxConditionLocal}
+                        onChange={(e) => setTaxConditionLocal(e.target.value)}
+                      >
+                        <option value="Monotributo">Monotributo</option>
+                        <option value="Responsable Inscripto">
+                          Responsable Inscripto
+                        </option>
+                        <option value="Exento">Exento</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-2">
+                        Ingresos Brutos
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+                        value={taxIibbLocal}
+                        onChange={(e) => setTaxIibbLocal(e.target.value)}
+                        placeholder="Ej: 30-12345678-9"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-2">
+                        Inicio de Actividades
+                      </label>
+                      <input
+                        type="text" // Date input might be better, but text gives format control to user
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+                        value={taxStartDateLocal}
+                        onChange={(e) => setTaxStartDateLocal(e.target.value)}
+                        placeholder="Ej: 01/01/2024"
+                      />
+                    </div>
+
                     {/* Certificados */}
                     <div className="col-span-1 md:col-span-2 space-y-3 pt-2 border-t border-slate-200 dark:border-slate-700 mt-2">
                       <h3 className="font-bold text-sm text-slate-700 dark:text-slate-300">
@@ -616,7 +705,7 @@ const ConfiguracionScreen = () => {
                   <div className="flex justify-start">
                     <button
                       onClick={async () => {
-                        const res = await window.api.invoke("create-backup");
+                        const res = await window.api.createBackup();
                         if (res.success) {
                           toast.success("Copia creada exitosamente");
                           loadBackups();
@@ -652,18 +741,9 @@ const ConfiguracionScreen = () => {
                               </p>
                             </div>
                             <button
-                              onClick={async () => {
-                                if (
-                                  confirm(
-                                    `¿Está seguro de RESTAURAR esta copia? \n${bak.name}\n\nEL SISTEMA SE REINICIARÁ Y SE PERDERÁN LOS DATOS NO GUARDADOS DESDE ESA COPIA.`,
-                                  )
-                                ) {
-                                  const res = await window.api.invoke(
-                                    "restore-backup",
-                                    bak.name,
-                                  );
-                                  if (!res.success) toast.error(res.message);
-                                }
+                              onClick={() => {
+                                setBackupToRestore(bak);
+                                setIsRestoreModalOpen(true);
                               }}
                               className="text-xs bg-slate-200 hover:bg-red-500 hover:text-white dark:bg-slate-700 dark:hover:bg-red-600 px-3 py-1 rounded transition-colors"
                             >
@@ -846,6 +926,27 @@ const ConfiguracionScreen = () => {
           )}
         </div>
       </div>
+      {/* Modal de Restauración */}
+      <ConfirmationModal
+        isOpen={isRestoreModalOpen}
+        onClose={() => {
+          setIsRestoreModalOpen(false);
+          setBackupToRestore(null);
+        }}
+        onConfirm={async () => {
+          if (backupToRestore) {
+            const res = await window.api.restoreBackup(backupToRestore.name);
+            if (!res.success) toast.error(res.message);
+            setIsRestoreModalOpen(false);
+            setBackupToRestore(null);
+          }
+        }}
+        title="Restaurar Copia de Seguridad"
+        message="¿Está seguro de que desea restaurar esta copia? EL SISTEMA SE REINICIARÁ y se perderán los datos actuales no guardados."
+        confirmText="Sí, Restaurar y Reiniciar"
+        cancelText="Cancelar"
+        isDestructive={true}
+      />
     </div>
   );
 };

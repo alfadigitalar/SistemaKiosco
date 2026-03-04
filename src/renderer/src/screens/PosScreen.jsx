@@ -17,9 +17,10 @@ import toast from "react-hot-toast";
 import PaymentModal from "../components/PaymentModal";
 import CustomerSearch from "../components/CustomerSearch";
 import WeightModal from "../components/WeightModal";
-import jsPDF from "jspdf";
+
 import DemoModal from "../components/DemoModal";
 import ConfirmationModal from "../components/ConfirmationModal";
+import { useConfig } from "../context/ConfigContext";
 
 /**
  * Pantalla Principal de Punto de Venta (POS)
@@ -35,10 +36,26 @@ export default function PosScreen() {
   // ESTADO
   // ═══════════════════════════════════════════════════════════
   // Inicializar carrito desde localStorage si existe
+
   const [carrito, setCarrito] = useState(() => {
     const saved = localStorage.getItem("cart_backup");
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Config Context
+  const {
+    kioskName,
+    kioskAddress,
+    taxEnabled,
+    taxCuit,
+    taxSalesPoint,
+    taxCertPath,
+    taxKeyPath,
+    taxBusinessName,
+    taxIibb,
+    taxStartDate,
+    taxCondition,
+  } = useConfig();
   const [codigo, setCodigo] = useState("");
   const [loading, setLoading] = useState(false);
   const [modalPagoAbierto, setModalPagoAbierto] = useState(false);
@@ -65,6 +82,17 @@ export default function PosScreen() {
 
   // Modal Confirmación Cancelar Venta
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
+
+  // --- NUEVAS FUNCIONALIDADES ---
+  // 1. Item Libre (Ad-Hoc)
+  const [adHocModalOpen, setAdHocModalOpen] = useState(false);
+  const [adHocData, setAdHocData] = useState({ name: "", price: "" });
+
+  // 2. Modo Factura / Ticket
+  const [invoiceMode, setInvoiceMode] = useState("ticket"); // 'ticket' | 'factura'
+
+  // 3. Formato A4
+  const [printFormat, setPrintFormat] = useState("ticket"); // 'ticket' | 'a4'
 
   const inputRef = useRef(null);
   const navigate = useNavigate();
@@ -305,11 +333,12 @@ export default function PosScreen() {
         newCart.push({ ...promo, cantidad: count });
       }
 
-      toast.success(`Se aplicó: ${promo.name}`);
-      // Sonido de éxito diferente (?)
-      playLowStockSound(); // Reutilizamos por ahora
       return newCart;
     });
+
+    // Toast y sonido FUERA del state updater para evitar duplicados
+    toast.success(`Se aplicó: ${promo.name}`);
+    playLowStockSound();
   };
 
   // ═══════════════════════════════════════════════════════════
@@ -335,11 +364,36 @@ export default function PosScreen() {
         return;
       }
 
+      // F4: MODO FACTURA (AFIP)
+      if (e.key === "F4") {
+        e.preventDefault();
+        setInvoiceMode("factura");
+        toast.success("MODO: FACTURA (AFIP)", {
+          style: { border: "2px solid #3b82f6", color: "#ffffff" },
+        });
+        return;
+      }
+
+      // F11: MODO TICKET (Interno)
+      if (e.key === "F11") {
+        e.preventDefault();
+        setInvoiceMode("ticket");
+        toast.success("MODO: TICKET (Interno)", {
+          style: { border: "2px solid #22c55e", color: "#ffffff" },
+        });
+        return;
+      }
+
       // Escape: CANCELAR VENTA (Solo si no hay modales abiertos, para evitar cierre accidental)
       if (e.key === "Escape" && !modalPagoAbierto && !weightModalOpen) {
         // Si tiene texto, limpiar input primero
         if (codigo) {
           setCodigo("");
+          return;
+        }
+        // Cerrar modal ad-hoc si esta abierto
+        if (adHocModalOpen) {
+          setAdHocModalOpen(false);
           return;
         }
         // Si no, preguntar cancelar
@@ -402,7 +456,7 @@ export default function PosScreen() {
 
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [carrito, modalPagoAbierto, weightModalOpen, codigo]); // Dependencias para funciones dentro del listener
+  }, [carrito, modalPagoAbierto, weightModalOpen, codigo, adHocModalOpen]); // Dependencias para funciones dentro del listener
 
   const playLowStockSound = () => {
     // Simple beep using AudioContext
@@ -446,6 +500,37 @@ export default function PosScreen() {
   // ═══════════════════════════════════════════════════════════
   // FUNCIONES DE PRODUCTO
   // ═══════════════════════════════════════════════════════════
+
+  // FUNCION ITEM LIBRE (AD-HOC)
+  const handleAdHocSubmit = (e) => {
+    e.preventDefault();
+    if (!adHocData.name || !adHocData.price) {
+      toast.error("Complete nombre y precio");
+      return;
+    }
+
+    const price = parseFloat(adHocData.price);
+    if (isNaN(price) || price <= 0) {
+      toast.error("El precio debe ser mayor a 0");
+      return;
+    }
+
+    const newItem = {
+      id: -1, // ID especial para items libres
+      name: adHocData.name,
+      barcode: "MANUAL",
+      sale_price: price,
+      stock_quantity: 9999,
+      measurement_unit: "un",
+      is_active: 1,
+      cantidad: 1, // Default 1
+    };
+
+    agregarAlCarrito(newItem);
+    setAdHocModalOpen(false);
+    setAdHocData({ name: "", price: "" }); // Reset
+    toast.success("Item agregado");
+  };
 
   // Buscar producto por código de barras
   const buscarProducto = async (e) => {
@@ -515,8 +600,12 @@ export default function PosScreen() {
       (cantidadActual + cantidadToAdd).toFixed(3),
     );
 
-    // Validación de Stock (Solo si NO es promo)
-    if (!producto.is_promo && nuevaCantidad > producto.stock_quantity) {
+    // Validación de Stock (Solo si NO es ad-hoc (id -1))
+    if (
+      producto.id !== -1 &&
+      !producto.isAdHoc &&
+      nuevaCantidad > producto.stock_quantity
+    ) {
       toast.error(`Stock insuficiente (Max: ${producto.stock_quantity})`);
       return;
     }
@@ -526,7 +615,7 @@ export default function PosScreen() {
     // Solo mostrar alerta si cruzamos el umbral o si ya estabamos abajo pero agregamos mas?
     // Mejor solo mostrar si queda poco stock, independientemente de si ya mostramos antes,
     // pero idealmente una vez por accion.
-    if (stockRestante <= producto.min_stock) {
+    if (producto.id !== -1 && stockRestante <= producto.min_stock) {
       toast(
         (t) => (
           <div className="flex items-center gap-2">
@@ -616,6 +705,21 @@ export default function PosScreen() {
     }
 
     setCarrito((prev) => {
+      const isAdHoc = producto.id === -1;
+
+      if (isAdHoc) {
+        return [
+          ...prev,
+          {
+            ...producto,
+            id: -Date.now(),
+            isAdHoc: true,
+            originalId: -1,
+            cantidad: cantidadToAdd,
+          },
+        ];
+      }
+
       // Re-buscar en prev para seguridad (aunque 'existe' calculado afuera deberia coincidir en este ciclo)
       const currentExiste = prev.find((p) => p.id === producto.id);
 
@@ -680,8 +784,13 @@ export default function PosScreen() {
     // Si intenta bajar de 1, no hacer nada (o dejar que la UI lo maneje, aqui retornamos)
     if (nuevaCantidad < 1) return;
 
-    // Validación de Stock al incrementar (Solo si NO es promo)
-    if (!item.is_promo && delta > 0 && nuevaCantidad > item.stock_quantity) {
+    // Validación de Stock al incrementar (Solo si NO es AdHoc)
+    if (
+      item.id !== -1 &&
+      !item.isAdHoc &&
+      delta > 0 &&
+      nuevaCantidad > item.stock_quantity
+    ) {
       toast.error(`Stock insuficiente (Max: ${item.stock_quantity})`);
       return;
     }
@@ -712,9 +821,15 @@ export default function PosScreen() {
   // Procesar el pago confirmado
   const procesarPago = async (pagoData) => {
     try {
+      // Preparar items: Mapear IDs temporales de AdHoc (-12312) a -1
+      const requestItems = carrito.map((item) => ({
+        ...item,
+        id: item.isAdHoc ? -1 : item.id,
+      }));
+
       // Preparar datos para el backend
       const saleData = {
-        items: carrito,
+        items: requestItems,
         total: total,
         paymentMethod: pagoData.metodo,
         userId: JSON.parse(localStorage.getItem("user") || "{}").id || 1, // Fallback a 1 si falla
@@ -727,51 +842,84 @@ export default function PosScreen() {
       if (resultado.success) {
         toast.success(`Venta #${resultado.saleId} completada`);
 
-        // IMPRIMIR TICKET SI ESTÁ HABILITADO
-        if (shouldPrintTicket) {
-          await window.api.printTicket({
-            ticketId: resultado.saleId,
-            date: new Date().toLocaleString(),
-            items: carrito,
-            total: total,
-          });
-        }
+        // --- INTEGRACIÓN ARCA (FACTURA ELECTRÓNICA) + IMPRESIÓN ---
+        if (invoiceMode === "factura") {
+          // 1. Primero llamar a AFIP para obtener CAE y número de comprobante
+          let afipResult = null;
+          try {
+            afipResult = await window.api.createElectronicInvoice({
+              saleId: resultado.saleId,
+              total: total,
+              items: carrito.map((i) => ({
+                title: i.name,
+                quantity: i.cantidad,
+                unit_price: i.sale_price,
+              })),
+              clientDoc: clienteSeleccionado ? clienteSeleccionado.dni : null,
+            });
 
-        // --- INTEGRACIÓN ARCA (FACTURA ELECTRÓNICA) ---
-        // Verificar configuración (cargamos config en useEffect o usamos window.api ?)
-        // Lo mejor es hacer una llamada rápida o usar el ConfigContext si lo tuvieramos envuelto.
-        // Como PosScreen no está bajo ConfigProvider en App.jsx (Route path="/pos" está FUERA de MainLayout que tiene ConfigProvider?)
-        // Ah, App.jsx: ConfigProvider envuelve TODO. OK.
-        // Pero PosScreen es una ruta hermana de MainLayout routes.
-        // Sí, ConfigProvider envuelve Routes. Así que PODEMOS usar useConfig().
-
-        // Sin embargo, para no refactorizar imports ahora mismo, haremos la llamada Directa al backend
-        // que ya verifica si está enabled. El handler 'create-electronic-invoice' verifica 'tax_enabled'.
-        // Solo llamamos y si retorna "disabled", ignoramos silenciosamente.
-
-        // Hacemos esto async (sin await) para no bloquear la UI? O mostramos "Emitiendo Factura"?
-        // Mejor mostrar un Toast de proceso.
-
-        window.api
-          .createElectronicInvoice({
-            saleId: resultado.saleId,
-            total: total,
-            items: carrito.map((i) => ({
-              title: i.name,
-              quantity: i.cantidad,
-              unit_price: i.sale_price,
-            })),
-            clientDoc: clienteSeleccionado ? clienteSeleccionado.dni : null, // Asumiendo DNI = CUIT para consumidor final identificado
-          })
-          .then((res) => {
-            if (res.success) {
-              toast.success(`CAE Autorizado: ${res.cae}`, { duration: 6000 });
+            if (afipResult.success) {
+              toast.success(`CAE Autorizado: ${afipResult.cae}`, {
+                duration: 6000,
+              });
             } else if (
-              res.message !== "Facturación electrónica deshabilitada"
+              afipResult.message !== "Facturación electrónica deshabilitada"
             ) {
-              toast.error(`Error AFIP: ${res.message}`, { duration: 6000 });
+              toast.error(`Error AFIP: ${afipResult.message}`, {
+                duration: 6000,
+              });
             }
-          });
+          } catch (afipErr) {
+            console.error("Error AFIP:", afipErr);
+            toast.error("Error al contactar AFIP", { duration: 6000 });
+          }
+
+          // 2. Imprimir factura A4 con datos de AFIP
+          if (shouldPrintTicket) {
+            await window.api.printTicket({
+              ticketId: resultado.saleId,
+              date: new Date().toLocaleString(),
+              items: carrito.map((i) => ({
+                name: i.name,
+                quantity: i.cantidad,
+                price: i.sale_price,
+              })),
+              total: total,
+              format: "a4",
+              // Datos AFIP para la factura
+              invoiceType:
+                afipResult?.voucherType === 6
+                  ? "B"
+                  : afipResult?.voucherType === 11
+                    ? "C"
+                    : afipResult?.voucherType === 1
+                      ? "A"
+                      : "C",
+              voucherNumber: afipResult?.voucherNumber || 0,
+              cae: afipResult?.cae || "",
+              caeFchVto: afipResult?.caeFchVto || "",
+              // Datos del cliente
+              clientName: clienteSeleccionado?.name || "Consumidor Final",
+              clientDni: clienteSeleccionado?.dni || "",
+              clientAddress: clienteSeleccionado?.address || "",
+            });
+          }
+        } else {
+          // MODO TICKET: Imprimir ticket normal
+          if (shouldPrintTicket) {
+            await window.api.printTicket({
+              ticketId: resultado.saleId,
+              date: new Date().toLocaleString(),
+              items: carrito.map((i) => ({
+                name: i.name,
+                quantity: i.cantidad,
+                price: i.sale_price,
+              })),
+              total: total,
+              format: printFormat,
+            });
+          }
+        }
 
         // PREPARAR PARA EMAIL
         setLastSale({
@@ -927,193 +1075,62 @@ export default function PosScreen() {
                   // So I can use `jspdf` here.
 
                   try {
-                    // Generar PDF "Factura B" Style
-                    const doc = new jsPDF();
-                    const pageWidth = doc.internal.pageSize.width; // ~210mm
-                    const pageHeight = doc.internal.pageSize.height;
+                    // Preparamos los datos completos para que el Backend genere el PDF (Mismo que print)
 
-                    // --- DATOS DEL COMERCIO (Mockup / LocalStorage) ---
+                    // Configuramos datos del negocio desde el contexto para asegurar que vayan bien
+                    // Aunque el backend también los lee, es doble seguridad o para visualizar en frontend si fuera necesario
                     const storeName =
-                      localStorage.getItem("kioskName") || "MI KIOSCO";
-                    const storeAddress = "Dirección del Comercio 123"; // Podríamos agregar esto a Config
-                    const storeCuit = "30-12345678-9";
-                    const isDev = false;
+                      taxBusinessName || kioskName || "MI KIOSCO";
+                    const storeCondition =
+                      taxCondition || "Responsable Inscripto";
 
-                    // --- ESTRUCTURA ---
+                    let invoiceLetter = "B";
+                    if (storeCondition === "Monotributo") {
+                      invoiceLetter = "C";
+                    }
 
-                    // 1. RECTÁNGULO GRANDE PRINCIPAL (Encabezado)
-                    // (x, y, w, h)
-                    doc.setLineWidth(0.5);
-                    doc.rect(10, 10, 190, 50);
-
-                    // Línea vertical divisoria
-                    doc.line(105, 10, 105, 60);
-
-                    // 2. CAJA "B"
-                    doc.rect(98, 5, 14, 14); // Caja flotante central
-                    doc.setFont("helvetica", "bold");
-                    doc.setFontSize(20);
-                    doc.text("B", 105, 14, { align: "center" });
-                    doc.setFontSize(8);
-                    doc.text("COD. 06", 105, 18, { align: "center" });
-
-                    // Linea que conecta la caja B con el borde
-                    doc.setLineWidth(0.5);
-                    doc.line(105, 19, 105, 60); // Continua la vertical
-
-                    // 3. LADO IZQUIERDO (Comercio)
-                    doc.setFontSize(24);
-                    doc.setFont("helvetica", "bold");
-                    doc.text(storeName.toUpperCase(), 55, 30, {
-                      align: "center",
-                    });
-
-                    doc.setFontSize(9);
-                    doc.setFont("helvetica", "normal");
-                    doc.text(`Domicilio: ${storeAddress}`, 55, 45, {
-                      align: "center",
-                    });
-                    doc.text("IVA Responsable Inscripto", 55, 50, {
-                      align: "center",
-                    });
-
-                    // 4. LADO DERECHO (Datos Factura)
-                    doc.setFontSize(18);
-                    doc.setFont("helvetica", "bold");
-                    doc.text("FACTURA", 150, 20, { align: "center" });
-
-                    doc.setFontSize(10);
-                    doc.setFont("helvetica", "bold");
-                    doc.text(
-                      `Nro. Comprobante: 0001-${lastSale?.id
-                        .toString()
-                        .padStart(8, "0")}`,
-                      120,
-                      30,
-                    );
-                    doc.text(`Fecha de Emisión: ${lastSale?.date}`, 120, 35);
-
-                    doc.setFontSize(9);
-                    doc.setFont("helvetica", "normal");
-                    doc.text(`C.U.I.T: ${storeCuit}`, 120, 42);
-                    doc.text(`Ing. Brutos: ${storeCuit}`, 120, 47);
-                    doc.text(`Inicio de Actividades: 01/01/2024`, 120, 52);
-
-                    // 5. DATOS DEL CLIENTE (Tira Horizontal)
-                    doc.rect(10, 62, 190, 12); // Caja
-                    doc.setFontSize(9);
-                    doc.setFont("helvetica", "bold");
-                    doc.text("Apellido y Nombre / Razón Social:", 12, 68);
-                    doc.setFont("helvetica", "normal");
-                    doc.text(
-                      lastSale?.clientName || "Consumidor Final",
-                      70,
-                      68,
-                    );
-
-                    doc.setFont("helvetica", "bold");
-                    doc.text("DNI / CUIT:", 130, 68);
-                    doc.setFont("helvetica", "normal");
-                    doc.text(lastSale?.clientDni || "-", 150, 68);
-
-                    doc.setFont("helvetica", "bold");
-                    doc.text("Condición IVA:", 12, 72); // Segunda linea dentro de la caja? No, ajustamos
-                    doc.setFont("helvetica", "normal");
-                    doc.text("Consumidor Final", 40, 72);
-
-                    // 6. TABLA DE PRODUCTOS
-                    let y = 78;
-                    // Encabezados (Fondo gris si quisieramos `doc.setFillColor(200, 200, 200); doc.rect(...)`)
-                    doc.setFillColor(230, 230, 230);
-                    doc.rect(10, y, 190, 8, "F"); // Relleno
-                    doc.rect(10, y, 190, 8, "S"); // Borde
-
-                    doc.setFont("helvetica", "bold");
-                    doc.setTextColor(0, 0, 0);
-                    doc.text("Producto", 15, y + 5);
-                    doc.text("Cant.", 130, y + 5, { align: "center" });
-                    doc.text("P. Unitario", 160, y + 5, { align: "right" });
-                    doc.text("Subtotal", 195, y + 5, { align: "right" });
-
-                    y += 8;
-                    doc.setFont("helvetica", "normal");
-
-                    lastSale?.items.forEach((item) => {
-                      const subtotal = item.sale_price * item.cantidad;
-                      const itemName =
-                        item.name.length > 45
-                          ? item.name.substring(0, 45) + "..."
-                          : item.name;
-
-                      doc.text(itemName, 12, y + 5);
-                      doc.text(item.cantidad.toString(), 130, y + 5, {
-                        align: "center",
-                      });
-                      doc.text(item.sale_price.toFixed(2), 160, y + 5, {
-                        align: "right",
-                      });
-                      doc.text(subtotal.toFixed(2), 195, y + 5, {
-                        align: "right",
-                      });
-
-                      y += 8;
-                    });
-
-                    // Línea final de items
-                    doc.line(10, y, 200, y);
-                    y += 5;
-
-                    // 7. TOTALES (Pie Derecho)
-                    // Subtotal
-                    doc.setFont("helvetica", "bold");
-                    doc.text("Subtotal:", 160, y + 5, { align: "right" });
-                    doc.text(`$${lastSale?.total.toFixed(2)}`, 195, y + 5, {
-                      align: "right",
-                    });
-                    y += 6;
-
-                    // Total
-                    doc.setFillColor(230, 230, 230); // Fondo gris para total
-                    doc.rect(140, y, 60, 8, "F");
-                    doc.setTextColor(0, 0, 0);
-                    doc.setFontSize(11);
-                    doc.text("Total:", 160, y + 5, { align: "right" });
-                    doc.text(`$${lastSale?.total.toFixed(2)}`, 195, y + 5, {
-                      align: "right",
-                    });
-
-                    y += 15;
-
-                    // 8. LEGALES / QR (Simulado)
-                    doc.setFontSize(8);
-                    doc.setFont("helvetica", "bold");
-                    doc.text("CAE N°: 7341823741283", 150, y);
-                    doc.text("Fecha Vto. CAE: 01/01/2026", 150, y + 4);
-
-                    doc.setFont("helvetica", "italic");
-                    doc.text("Comprobante Autorizado", 12, y);
-                    doc.text(
-                      "Esta factura es un documento no válido como factura fiscal real (Demo Kubo POS)",
-                      12,
-                      y + 4,
-                    );
-
-                    const pdfArrayBuffer = doc.output("arraybuffer");
+                    // Datos del ticket
+                    const ticketData = {
+                      items: lastSale?.items.map((i) => ({
+                        name: i.name,
+                        quantity: i.cantidad,
+                        price: i.sale_price,
+                        subtotal: i.sale_price * i.cantidad,
+                      })),
+                      total: lastSale?.total || 0,
+                      date: lastSale?.date || new Date().toLocaleString(),
+                      voucherNumber:
+                        lastSale?.invoice_number || lastSale?.id || 0,
+                      invoiceType:
+                        lastSale?.invoice_type_letter || invoiceLetter, // Si ya tenemos letra guardada, genial. Si no, calculamos.
+                      cae: lastSale?.cae || "",
+                      caeFchVto: lastSale?.cae_expiration || "",
+                      // Datos cliente
+                      clientName: lastSale?.clientName || "Consumidor Final",
+                      clientDni: lastSale?.clientDni || "",
+                      clientCondicionIva:
+                        lastSale?.clientCondition || "Consumidor Final", // Asumimos que guardamos esto o usamos default
+                      clientAddress: lastSale?.clientAddress || "",
+                    };
 
                     const res = await window.api.sendEmailTicket({
                       email: emailToSend,
-                      subject: `Factura #${lastSale?.id} - ${storeName}`,
-                      pdfBuffer: pdfArrayBuffer,
+                      subject: `Factura #${ticketData.voucherNumber} - ${storeName}`,
+                      ticketData: ticketData,
                     });
 
                     if (res.success) {
-                      toast.success("Email enviado!", { id: toastId });
+                      toast.success("Email enviado correctamente!", {
+                        id: toastId,
+                      });
                       setEmailModalOpen(false);
                     } else {
-                      toast.error("Error: " + res.message, { id: toastId });
+                      toast.error("Error al enviar email: " + res.message, {
+                        id: toastId,
+                      });
                     }
                   } catch (e) {
-                    console.error("Error generando PDF/Email:", e);
+                    console.error("Error enviando email:", e);
                     toast.error("Error: " + (e.message || "Desconocido"), {
                       id: toastId,
                     });
@@ -1336,6 +1353,15 @@ export default function PosScreen() {
             <Smartphone size={20} />{" "}
             <span className="hidden xl:inline">Celular</span>
           </button>
+
+          <button
+            onClick={() => setAdHocModalOpen(true)}
+            className="px-6 py-4 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded-xl transition flex items-center gap-2 font-bold shrink-0 border border-purple-200 dark:border-purple-800"
+            title="Agregar Item Manual (Ad-Hoc)"
+          >
+            <span className="text-xl leading-none">+</span>{" "}
+            <span className="hidden xl:inline">Item Libre</span>
+          </button>
         </div>
       </div>
       {/* ════════════════════════════════════════════════════════ */}
@@ -1398,6 +1424,48 @@ export default function PosScreen() {
 
           {/* Botones de Acción */}
           <div className="grid gap-2 mt-4">
+            {/* Toggles de Configuración Rápida */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() =>
+                  setInvoiceMode(
+                    invoiceMode === "ticket" ? "factura" : "ticket",
+                  )
+                }
+                className={`p-2 rounded-lg text-xs font-bold border transition-colors flex flex-col items-center justify-center gap-1
+                  ${
+                    invoiceMode === "factura"
+                      ? "bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300"
+                      : "bg-gray-50 border-gray-200 text-gray-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400"
+                  }`}
+              >
+                <span>
+                  {invoiceMode === "factura" ? "📄 FACTURA A/B" : "🎟️ TICKET X"}
+                </span>
+                <span className="opacity-60 text-[10px]">
+                  {invoiceMode === "factura" ? "[F4]" : "[F11]"}
+                </span>
+              </button>
+
+              <button
+                onClick={() =>
+                  setPrintFormat(printFormat === "ticket" ? "a4" : "ticket")
+                }
+                className={`p-2 rounded-lg text-xs font-bold border transition-colors flex flex-col items-center justify-center gap-1
+                  ${
+                    printFormat === "a4"
+                      ? "bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-700 dark:text-indigo-300"
+                      : "bg-gray-50 border-gray-200 text-gray-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400"
+                  }`}
+              >
+                <span>
+                  {printFormat === "a4" ? "🖨️ Formato A4" : "📜 Formato 58mm"}
+                </span>
+                <span className="opacity-60 text-[10px]">
+                  Formato Impresión
+                </span>
+              </button>
+            </div>
             {/* Toggle Impresión */}
             <div
               onClick={() => setShouldPrintTicket(!shouldPrintTicket)}
@@ -1481,6 +1549,68 @@ export default function PosScreen() {
             >
               IR A ABRIR CAJA
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Ad-Hoc (Item Libre) */}
+      {adHocModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700 animate-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-bold mb-4 text-slate-800 dark:text-white flex items-center gap-2">
+              <span className="bg-purple-100 text-purple-600 p-1 rounded-lg text-sm">
+                ✨
+              </span>
+              Agregar Item Libre
+            </h3>
+            <form onSubmit={handleAdHocSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
+                  Concepto / Nombre
+                </label>
+                <input
+                  autoFocus
+                  type="text"
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none transition"
+                  placeholder="Ej: Mano de Obra"
+                  value={adHocData.name}
+                  onChange={(e) =>
+                    setAdHocData({ ...adHocData, name: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
+                  Precio Unitario ($)
+                </label>
+                <input
+                  type="number"
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none font-mono font-bold text-lg transition"
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                  value={adHocData.price}
+                  onChange={(e) =>
+                    setAdHocData({ ...adHocData, price: e.target.value })
+                  }
+                />
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setAdHocModalOpen(false)}
+                  className="flex-1 py-3 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-lg shadow-purple-900/30 transition hover:scale-105 active:scale-95"
+                >
+                  Agregar Item
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
