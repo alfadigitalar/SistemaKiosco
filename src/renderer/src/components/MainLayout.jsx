@@ -150,7 +150,7 @@ const MainLayout = () => {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-2 space-y-1">
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-2 space-y-1 scrollbar-hide">
           {menuItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
