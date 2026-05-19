@@ -441,10 +441,10 @@ const generateBudgetHTML = (data) => {
     const subtotal = (item.price * item.quantity).toFixed(2);
     itemsRows += `
       <tr>
-        <td style="padding: 8px 10px; border-bottom: 1px solid #eee;">\${item.name}</td>
-        <td style="padding: 8px 10px; border-bottom: 1px solid #eee; text-align: center;">\${item.quantity}</td>
-        <td style="padding: 8px 10px; border-bottom: 1px solid #eee; text-align: right;">\${parseFloat(item.price).toFixed(2)}</td>
-        <td style="padding: 8px 10px; border-bottom: 1px solid #eee; text-align: right;">\${subtotal}</td>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #eee;">${item.name}</td>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #eee; text-align: right;">${parseFloat(item.price).toFixed(2)}</td>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #eee; text-align: right;">${subtotal}</td>
       </tr>
     `;
   }
@@ -465,9 +465,9 @@ const generateBudgetHTML = (data) => {
       <div style="position: relative; border: 1.5px solid #000; display: flex; min-height: 120px;">
         <!-- Lado izquierdo -->
         <div style="flex: 1; padding: 15px 20px; border-right: 1.5px solid #000; text-align: center; display: flex; flex-direction: column; justify-content: center;">
-          <div style="font-size: 28px; font-weight: bold; text-transform: uppercase; margin-bottom: 10px;">\${storeName}</div>
+          <div style="font-size: 28px; font-weight: bold; text-transform: uppercase; margin-bottom: 10px;">${storeName}</div>
           <div style="font-size: 11px; color: #333; line-height: 1.6;">
-            \${address ? `<div>Domicilio: \${address}</div>` : ""}
+            ${address ? `<div>Domicilio: ${address}</div>` : ""}
           </div>
         </div>
         <!-- Caja central con letra X (para presupuestos u otros documentos no fiscales) -->
@@ -480,7 +480,7 @@ const generateBudgetHTML = (data) => {
         <!-- Lado derecho -->
         <div style="flex: 1; padding: 15px 20px; text-align: left; display: flex; flex-direction: column; justify-content: center;">
           <div style="font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 8px; letter-spacing: 1px;">PRESUPUESTO</div>
-          <div style="font-size: 11px; font-weight: bold; margin-bottom: 3px;">Fecha: \${date}</div>
+          <div style="font-size: 11px; font-weight: bold; margin-bottom: 3px;">Fecha: ${date}</div>
           <div style="font-size: 10px; color: #666; font-style: italic; margin-top: 5px;">
             Presupuesto sujeto a cambios sin previo aviso.
           </div>
@@ -489,8 +489,8 @@ const generateBudgetHTML = (data) => {
 
       <!-- === DATOS DEL CLIENTE === -->
       <div style="border: 1.5px solid #000; border-top: none; padding: 10px 15px; font-size: 10px; line-height: 1.8;">
-        <div><span style="font-weight: bold;">Señor(es):</span> &nbsp;&nbsp; \${clientName} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span style="font-weight: bold;">DNI / CUIT:</span> &nbsp;&nbsp; \${clientDni}</div>
-        <div><span style="font-weight: bold;">Condición IVA:</span> &nbsp;&nbsp; \${clientCondition}</div>
+        <div><span style="font-weight: bold;">Señor(es):</span> &nbsp;&nbsp; ${clientName} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span style="font-weight: bold;">DNI / CUIT:</span> &nbsp;&nbsp; ${clientDni}</div>
+        <div><span style="font-weight: bold;">Condición IVA:</span> &nbsp;&nbsp; ${clientCondition}</div>
       </div>
 
       <!-- === TABLA DE ITEMS === -->
@@ -504,7 +504,7 @@ const generateBudgetHTML = (data) => {
           </tr>
         </thead>
         <tbody>
-          \${itemsRows}
+          ${itemsRows}
         </tbody>
       </table>
 
@@ -516,7 +516,7 @@ const generateBudgetHTML = (data) => {
         <div style="width: 250px;">
           <div style="display: flex; justify-content: space-between; padding: 6px 8px; font-weight: bold; font-size: 15px; background: #f2f2f2; border: 1px solid #000;">
             <span>TOTAL:</span>
-            <span>$\${total.toFixed(2)}</span>
+            <span>$${total.toFixed(2)}</span>
           </div>
         </div>
       </div>
