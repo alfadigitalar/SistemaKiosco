@@ -532,30 +532,39 @@ export default function PosScreen() {
       return;
     }
 
-    const validUntil = validUntilValue ? new Date(validUntilValue) : null;
-    if (validUntilValue && (!validUntil || Number.isNaN(validUntil.getTime()))) {
-      toast.error("La validez ingresada no es válida");
-      return;
+    if (validUntilValue) {
+      const validUntilDateObj = new Date(validUntilValue);
+      if (!validUntilDateObj || Number.isNaN(validUntilDateObj.getTime())) {
+        toast.error("La validez ingresada no es válida");
+        return;
+      }
     }
 
-    const formatBudgetDate = (date) =>
-      date.toLocaleDateString("es-AR", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      });
-    const formatBudgetDateTime = (date) =>
-      `${formatBudgetDate(date)}, ${date.toLocaleTimeString("es-AR", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      })} hs`;
+    const formatBudgetLocalStr = (dateStr, timeStr) => {
+      if (!dateStr) return "";
+      const parts = dateStr.split("-");
+      if (parts.length !== 3) return "";
+      const [yr, mo, dy] = parts;
+      const months = [
+        "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+      ];
+      const monthName = months[parseInt(mo, 10) - 1] || "";
+      const dayStr = parseInt(dy, 10).toString().padStart(2, "0");
+      const baseDate = `${dayStr} de ${monthName} de ${yr}`;
+      if (timeStr) {
+        return `${baseDate}, ${timeStr} hs`;
+      }
+      return baseDate;
+    };
 
     const issueDate = new Date();
-    const issueDateText = formatBudgetDate(issueDate);
-    const validUntilText = validUntil
-      ? formatBudgetDateTime(validUntil)
-      : "";
+    const pad = (n) => String(n).padStart(2, "0");
+    const issueDateStr = `${issueDate.getFullYear()}-${pad(issueDate.getMonth() + 1)}-${pad(issueDate.getDate())}`;
+    const issueTimeStr = `${pad(issueDate.getHours())}:${pad(issueDate.getMinutes())}`;
+    
+    const issueDateText = formatBudgetLocalStr(issueDateStr, issueTimeStr);
+    const validUntilText = formatBudgetLocalStr(budgetValidityDate, budgetValidityTime);
 
     // Map cart items to the format the backend expects
     const items = carrito.map((item) => ({
@@ -1590,7 +1599,7 @@ export default function PosScreen() {
             {budgetEnabled && (
               <button
                 onClick={openBudgetModal}
-                className="w-full py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-orange-900/30 flex items-center justify-center gap-2 transition transform active:scale-95"
+                className="w-full py-2.5 bg-[#ff6c00] hover:bg-[#ff8024] active:bg-[#e05f00] text-white rounded-xl font-bold text-lg shadow-lg shadow-[#ff6c00]/30 flex items-center justify-center gap-2 transition transform active:scale-95"
                 title="Presiona F5 para generar presupuesto"
               >
                 <Printer size={24} /> PRESUPUESTO{" "}
