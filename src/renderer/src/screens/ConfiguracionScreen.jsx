@@ -28,6 +28,7 @@ const ConfiguracionScreen = () => {
     themeMode,
     updateConfig,
     getThemeClasses,
+    budgetEnabled,
   } = useConfig();
 
   const [activeTab, setActiveTab] = useState("general");
@@ -72,6 +73,7 @@ const ConfiguracionScreen = () => {
   const [taxIibbLocal, setTaxIibbLocal] = useState("");
   const [taxStartDateLocal, setTaxStartDateLocal] = useState("");
   const [taxConditionLocal, setTaxConditionLocal] = useState("Monotributo");
+  const [budgetEnabledLocal, setBudgetEnabledLocal] = useState(false);
 
   // Estado para gestión de usuario
   const [currentUser, setCurrentUser] = useState({});
@@ -135,6 +137,7 @@ const ConfiguracionScreen = () => {
     setTaxIibbLocal(taxIibb || "");
     setTaxStartDateLocal(taxStartDate || "");
     setTaxConditionLocal(taxCondition || "Monotributo");
+    setBudgetEnabledLocal(budgetEnabled);
   }, [
     kioskName,
     kioskAddress,
@@ -149,6 +152,7 @@ const ConfiguracionScreen = () => {
     taxIibb,
     taxStartDate,
     taxCondition,
+    budgetEnabled,
   ]);
 
   const loadBackups = async () => {
@@ -200,6 +204,7 @@ const ConfiguracionScreen = () => {
         tax_iibb: taxIibbLocal,
         tax_start_date: taxStartDateLocal,
         tax_condition: taxConditionLocal,
+        budget_enabled: budgetEnabledLocal ? "true" : "false",
       });
 
       // 2. Guardar Perfil Usuario
@@ -676,6 +681,32 @@ const ConfiguracionScreen = () => {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Sección Módulo de Presupuestos */}
+              <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg transition-colors">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800 dark:text-white">
+                  <Layout className="text-slate-400" /> Módulo de Presupuestos
+                </h2>
+                <div className="mb-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={budgetEnabledLocal}
+                        onChange={(e) => setBudgetEnabledLocal(e.target.checked)}
+                      />
+                      <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                      <span className="ml-3 text-sm font-medium text-slate-900 dark:text-slate-300">
+                        {budgetEnabledLocal ? "Habilitado" : "Deshabilitado"}
+                      </span>
+                    </label>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Habilita la opción de generar y guardar presupuestos en formato PDF desde la pantalla de venta.
+                  </p>
+                </div>
               </div>
 
               <SaveButton />

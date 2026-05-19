@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import PaymentModal from "../components/PaymentModal";
 import CustomerSearch from "../components/CustomerSearch";
 import WeightModal from "../components/WeightModal";
@@ -55,6 +57,7 @@ export default function PosScreen() {
     taxIibb,
     taxStartDate,
     taxCondition,
+    budgetEnabled,
   } = useConfig();
   const [codigo, setCodigo] = useState("");
   const [loading, setLoading] = useState(false);
@@ -93,6 +96,11 @@ export default function PosScreen() {
 
   // 3. Formato A4
   const [printFormat, setPrintFormat] = useState("ticket"); // 'ticket' | 'a4'
+
+  // 4. Presupuestos
+  const [budgetValidityModalOpen, setBudgetValidityModalOpen] = useState(false);
+  const [budgetValidityDate, setBudgetValidityDate] = useState("");
+  const [budgetValidityTime, setBudgetValidityTime] = useState("18:00");
 
   const inputRef = useRef(null);
   const navigate = useNavigate();
@@ -364,6 +372,13 @@ export default function PosScreen() {
         return;
       }
 
+      // F5: GENERAR PRESUPUESTO
+      if (e.key === "F5" && budgetEnabled) {
+        e.preventDefault();
+        openBudgetModal();
+        return;
+      }
+
       // F4: MODO FACTURA (AFIP)
       if (e.key === "F4") {
         e.preventDefault();
@@ -386,6 +401,10 @@ export default function PosScreen() {
 
       // Escape: CANCELAR VENTA (Solo si no hay modales abiertos, para evitar cierre accidental)
       if (e.key === "Escape" && !modalPagoAbierto && !weightModalOpen) {
+        if (budgetValidityModalOpen) {
+          setBudgetValidityModalOpen(false);
+          return;
+        }
         // Si tiene texto, limpiar input primero
         if (codigo) {
           setCodigo("");
@@ -456,7 +475,7 @@ export default function PosScreen() {
 
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [carrito, modalPagoAbierto, weightModalOpen, codigo, adHocModalOpen]); // Dependencias para funciones dentro del listener
+  }, [carrito, modalPagoAbierto, weightModalOpen, budgetValidityModalOpen, codigo, adHocModalOpen, budgetEnabled]); // Dependencias para funciones dentro del listener
 
   const playLowStockSound = () => {
     // Simple beep using AudioContext
@@ -496,6 +515,148 @@ export default function PosScreen() {
 
   // Total = subtotal + impuestos (0% por ahora)
   const total = subtotal;
+
+  const openBudgetModal = () => {
+    const nextDay = new Date();
+    nextDay.setDate(nextDay.getDate() + 1);
+    setBudgetValidityDate(nextDay.toISOString().slice(0, 10));
+    setBudgetValidityTime("18:00");
+    setBudgetValidityModalOpen(true);
+  };
+
+  const generarPresupuesto = async (validUntilValue) => {
+    if (carrito.length === 0) {
+      toast.error("Agregue productos al presupuesto");
+      return;
+    }
+
+    const validUntil = validUntilValue ? new Date(validUntilValue) : new Date();
+    if (Number.isNaN(validUntil.getTime())) {
+      toast.error("La validez ingresada no es válida");
+      return;
+    }
+
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 40;
+    const primary = [37, 99, 235];
+    const dark = [15, 23, 42];
+    const navy = [30, 41, 59];
+    const light = [248, 250, 252];
+    const line = [226, 232, 240];
+    const white = [255, 255, 255];
+    const issueDate = new Date();
+    const issueDateText = `${issueDate.toLocaleDateString("es-AR")} ${issueDate.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
+    const validUntilText = `${validUntil.toLocaleDateString("es-AR")} ${validUntil.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
+
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, pageWidth, pageHeight, "F");
+
+    doc.setFillColor(...primary);
+    doc.rect(0, 0, pageWidth, 52, "F");
+    doc.setFillColor(...dark);
+    doc.rect(0, 52, pageWidth, 8, "F");
+
+    doc.setTextColor(...white);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(26);
+    doc.text("PRESUPUESTO", margin, 34);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(199, 210, 254);
+    doc.text("KUBO - Sistema Para Tu Kiosco", margin, 46);
+
+    doc.setFillColor(...light);
+    doc.roundedRect(margin, 72, pageWidth - margin * 2, 54, 8, 8, "F");
+    doc.setDrawColor(...line);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(margin, 72, pageWidth - margin * 2, 54, 8, 8, "S");
+
+    doc.setTextColor(...dark);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("DATOS DEL CLIENTE", margin + 12, 86);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(`Cliente: ${clienteSeleccionado?.name || "Consumidor Final"}`, margin + 12, 100);
+    doc.text(`Email: ${clienteSeleccionado?.email || "-"}`, margin + 12, 112);
+    doc.text(`Tel: ${clienteSeleccionado?.phone || "-"}`, margin + 12, 124);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("DATOS DEL PRESUPUESTO", pageWidth / 2, 86);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(`Emitido: ${issueDateText}`, pageWidth / 2, 100);
+    doc.text(`Válido hasta: ${validUntilText}`, pageWidth / 2, 112);
+    doc.text(`Ref: #${new Date().getTime().toString().slice(-6)}`, pageWidth / 2, 124);
+
+    autoTable(doc, {
+      startY: 140,
+      margin: { left: margin, right: margin },
+      theme: "striped",
+      headStyles: {
+        fillColor: navy,
+        textColor: 255,
+        fontStyle: "bold",
+        fontSize: 10,
+      },
+      bodyStyles: {
+        fontSize: 9,
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252],
+      },
+      styles: {
+        cellPadding: 5,
+        textColor: 50,
+        lineColor: [200, 200, 200],
+        lineWidth: 0.3,
+      },
+      columns: [
+        { header: "Cant.", dataKey: "cantidad", width: 20 },
+        { header: "Descripción del Producto", dataKey: "name", width: 90 },
+        { header: "P. Unitario", dataKey: "sale_price", width: 30 },
+        { header: "Importe", dataKey: "subtotal", width: 35 },
+      ],
+      body: carrito.map((item) => ({
+        cantidad: item.cantidad,
+        name: item.name,
+        sale_price: `$${item.sale_price.toFixed(2)}`,
+        subtotal: `$${(item.sale_price * item.cantidad).toFixed(2)}`,
+      })),
+    });
+
+    const finalY = doc.lastAutoTable?.finalY || 140;
+    const totalY = Math.min(finalY + 16, pageHeight - 80);
+
+    doc.setFillColor(...primary);
+    doc.roundedRect(margin, totalY, pageWidth - margin * 2, 38, 6, 6, "F");
+    doc.setTextColor(...white);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("TOTAL PRESUPUESTO", margin + 16, totalY + 16);
+    doc.setFontSize(20);
+    doc.text(`$${total.toFixed(2)}`, pageWidth - margin - 16, totalY + 26, { align: "right" });
+
+    doc.setTextColor(100, 116, 139);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("KUBO - Sistema Integral para Kioscos", margin, pageHeight - 20);
+
+    const pdfBuffer = doc.output("arraybuffer");
+    const result = await window.api.saveBudgetPdf({
+      pdfBuffer,
+      fileName: `presupuesto_${Date.now()}.pdf`,
+    });
+
+    if (result.success) {
+      toast.success("Presupuesto guardado");
+    } else if (result.message !== "Guardado cancelado") {
+      toast.error(result.message || "No se pudo guardar el presupuesto");
+    }
+  };
 
   // ═══════════════════════════════════════════════════════════
   // FUNCIONES DE PRODUCTO
@@ -1509,6 +1670,17 @@ export default function PosScreen() {
               </div>
             </div>
 
+            {budgetEnabled && (
+              <button
+                onClick={openBudgetModal}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-blue-900/30 flex items-center justify-center gap-2 transition transform active:scale-95 mb-2"
+                title="Presiona F5 para generar presupuesto"
+              >
+                <Printer size={24} /> PRESUPUESTO{" "}
+                <span className="text-sm opacity-60 font-mono ml-1">[F5]</span>
+              </button>
+            )}
+
             <button
               onClick={abrirModalPago}
               className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-green-900/30 flex items-center justify-center gap-2 transition transform active:scale-95"
@@ -1611,6 +1783,65 @@ export default function PosScreen() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Presupuesto */}
+      {budgetValidityModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700 animate-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-bold mb-4 text-slate-800 dark:text-white flex items-center gap-2">
+              <span className="bg-blue-100 text-blue-600 p-1 rounded-lg text-sm">
+                📅
+              </span>
+              Validez del Presupuesto
+            </h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    Fecha
+                  </label>
+                  <input
+                    type="date"
+                    autoFocus
+                    value={budgetValidityDate}
+                    onChange={(e) => setBudgetValidityDate(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition animate-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    Hora
+                  </label>
+                  <input
+                    type="time"
+                    value={budgetValidityTime}
+                    onChange={(e) => setBudgetValidityTime(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition animate-none"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setBudgetValidityModalOpen(false)}
+                  className="flex-1 py-3 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    const validUntilValue = `${budgetValidityDate}T${budgetValidityTime}:00`;
+                    setBudgetValidityModalOpen(false);
+                    await generarPresupuesto(validUntilValue);
+                  }}
+                  className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-900/30 transition hover:scale-105 active:scale-95"
+                >
+                  Generar PDF
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

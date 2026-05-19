@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Genera el HTML para el ticket de venta.
  * Soporta formato de 58mm y 80mm (responsive).
  */
@@ -420,4 +420,116 @@ const generateFacturaHTML = (data) => {
   return html;
 };
 
-module.exports = { generateTicketHTML, generateFacturaHTML };
+/**
+ * Genera el HTML de un Presupuesto (A4)
+ * Documento no válido como factura
+ */
+const generateBudgetHTML = (data) => {
+  const storeName = data.storeName || "MI KIOSCO";
+  const address = data.address || "";
+  const date = data.date || "";
+  const items = data.items || [];
+  const total = parseFloat(data.total) || 0;
+  const clientName = data.clientName || "Consumidor Final";
+  const clientDni = data.clientDni || "-";
+  const clientCondition = data.clientCondicionIva || "Consumidor Final";
+
+  // Items rows
+  let itemsRows = "";
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const subtotal = (item.price * item.quantity).toFixed(2);
+    itemsRows += `
+      <tr>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #eee;">\${item.name}</td>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #eee; text-align: center;">\${item.quantity}</td>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #eee; text-align: right;">\${parseFloat(item.price).toFixed(2)}</td>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #eee; text-align: right;">\${subtotal}</td>
+      </tr>
+    `;
+  }
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Presupuesto</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Helvetica, Arial, sans-serif; font-size: 11px; color: #000; width: 210mm; padding: 15mm 15mm; background: #fff; }
+      </style>
+    </head>
+    <body>
+      <!-- === HEADER PRINCIPAL === -->
+      <div style="position: relative; border: 1.5px solid #000; display: flex; min-height: 120px;">
+        <!-- Lado izquierdo -->
+        <div style="flex: 1; padding: 15px 20px; border-right: 1.5px solid #000; text-align: center; display: flex; flex-direction: column; justify-content: center;">
+          <div style="font-size: 28px; font-weight: bold; text-transform: uppercase; margin-bottom: 10px;">\${storeName}</div>
+          <div style="font-size: 11px; color: #333; line-height: 1.6;">
+            \${address ? `<div>Domicilio: \${address}</div>` : ""}
+          </div>
+        </div>
+        <!-- Caja central con letra X (para presupuestos u otros documentos no fiscales) -->
+        <div style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #fff; border: 1.5px solid #000; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; z-index: 10;">
+          <span style="font-size: 24px; font-weight: bold;">X</span>
+        </div>
+        <div style="position: absolute; top: 30px; left: 50%; transform: translateX(-50%); font-size: 6px; font-weight: bold; text-align: center; z-index: 10; width: 80px; text-transform: uppercase;">
+          Documento no válido como factura
+        </div>
+        <!-- Lado derecho -->
+        <div style="flex: 1; padding: 15px 20px; text-align: left; display: flex; flex-direction: column; justify-content: center;">
+          <div style="font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 8px; letter-spacing: 1px;">PRESUPUESTO</div>
+          <div style="font-size: 11px; font-weight: bold; margin-bottom: 3px;">Fecha: \${date}</div>
+          <div style="font-size: 10px; color: #666; font-style: italic; margin-top: 5px;">
+            Presupuesto sujeto a cambios sin previo aviso.
+          </div>
+        </div>
+      </div>
+
+      <!-- === DATOS DEL CLIENTE === -->
+      <div style="border: 1.5px solid #000; border-top: none; padding: 10px 15px; font-size: 10px; line-height: 1.8;">
+        <div><span style="font-weight: bold;">Señor(es):</span> &nbsp;&nbsp; \${clientName} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span style="font-weight: bold;">DNI / CUIT:</span> &nbsp;&nbsp; \${clientDni}</div>
+        <div><span style="font-weight: bold;">Condición IVA:</span> &nbsp;&nbsp; \${clientCondition}</div>
+      </div>
+
+      <!-- === TABLA DE ITEMS === -->
+      <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+        <thead>
+          <tr style="background: #f2f2f2; border: 1.5px solid #000;">
+            <th style="padding: 8px 10px; text-align: left; font-size: 11px; font-weight: bold; border: 1px solid #ccc;">Descripción</th>
+            <th style="padding: 8px 10px; text-align: center; font-size: 11px; font-weight: bold; border: 1px solid #ccc; width: 10%;">Cant.</th>
+            <th style="padding: 8px 10px; text-align: right; font-size: 11px; font-weight: bold; border: 1px solid #ccc; width: 15%;">P. Unitario</th>
+            <th style="padding: 8px 10px; text-align: right; font-size: 11px; font-weight: bold; border: 1px solid #ccc; width: 20%;">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          \${itemsRows}
+        </tbody>
+      </table>
+
+      <!-- Linea bajo la tabla -->
+      <div style="border-top: 1.5px solid #000; margin-top: 5px;"></div>
+
+      <!-- === TOTALES === -->
+      <div style="display: flex; justify-content: flex-end; margin-top: 15px; font-size: 12px;">
+        <div style="width: 250px;">
+          <div style="display: flex; justify-content: space-between; padding: 6px 8px; font-weight: bold; font-size: 15px; background: #f2f2f2; border: 1px solid #000;">
+            <span>TOTAL:</span>
+            <span>$\${total.toFixed(2)}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- === PIE DE PAGINA === -->
+      <div style="margin-top: 50px; text-align: center; font-size: 9px; color: #777; border-top: 1px dashed #ccc; padding-top: 15px;">
+        Este documento es un presupuesto estimativo y no posee validez fiscal.
+      </div>
+    </body>
+    </html>
+  `;
+
+  return html;
+};
+
+module.exports = { generateTicketHTML, generateFacturaHTML, generateBudgetHTML };

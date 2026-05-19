@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld("api", {
 
   // Impresión
   printTicket: (data) => ipcRenderer.invoke("print-ticket", data),
+  saveBudgetPdf: (data) => ipcRenderer.invoke("save-budget-pdf", data),
 
   // ═══════════════════════════════════════════════════════════
   // MÉTODOS DE VENTAS

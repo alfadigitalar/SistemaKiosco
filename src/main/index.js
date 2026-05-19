@@ -171,6 +171,75 @@ app.whenReady().then(() => {
     }
   });
 
+  ipcMain.handle("save-budget-pdf", async (event, budgetData) => {
+    try {
+      const { dialog } = require("electron");
+      const fs = require("fs");
+      const { generateBudgetHTML } = require("./ticketTemplate");
+
+      const { filePath } = await dialog.showSaveDialog(mainWindow, {
+        title: "Guardar Presupuesto",
+        defaultPath: `Presupuesto-${Date.now()}.pdf`,
+        filters: [{ name: "Documentos PDF", extensions: ["pdf"] }],
+      });
+
+      if (!filePath) {
+        return { success: false, cancelled: true };
+      }
+
+      // Crear ventana oculta para renderizar el presupuesto
+      const printWin = new BrowserWindow({
+        show: false,
+        webPreferences: {
+          nodeIntegration: true,
+        },
+      });
+
+      // Obtener configuración del negocio
+      const { all } = require("./db");
+      const rawSettings = await all("SELECT * FROM settings");
+      const settings = rawSettings.reduce((acc, row) => {
+        acc[row.key] = row.value;
+        return acc;
+      }, {});
+
+      const storeName = settings.kiosk_name || "Novy Kiosco";
+      const address = settings.kiosk_address || "Dirección no configurada";
+
+      const html = generateBudgetHTML({
+        storeName,
+        address,
+        date: budgetData.date,
+        items: budgetData.items,
+        total: budgetData.total,
+        clientName: budgetData.clientName || "Consumidor Final",
+        clientDni: budgetData.clientDni || "",
+        clientCondicionIva: budgetData.clientCondicionIva || "Consumidor Final",
+      });
+
+      // Cargar HTML
+      await printWin.loadURL(
+        `data:text/html;charset=utf-8,${encodeURIComponent(html)}`,
+      );
+
+      // Generar PDF
+      const pdfBuffer = await printWin.webContents.printToPDF({
+        marginsType: 0, // No margins (handled by CSS)
+        pageSize: "A4",
+        printBackground: true,
+      });
+
+      // Guardar archivo
+      await fs.promises.writeFile(filePath, pdfBuffer);
+      printWin.close();
+
+      return { success: true, filePath };
+    } catch (error) {
+      console.error("Error saving budget PDF:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // 3. Crear Ventana Principal
   createWindow();
 

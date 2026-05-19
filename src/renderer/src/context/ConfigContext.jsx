@@ -21,6 +21,7 @@ export const ConfigProvider = ({ children }) => {
   const [taxIibb, setTaxIibb] = useState("");
   const [taxStartDate, setTaxStartDate] = useState("");
   const [taxCondition, setTaxCondition] = useState("Monotributo");
+  const [budgetEnabled, setBudgetEnabled] = useState(false);
 
   // Mapa de colores para Tailwind (se usará para clases dinámicas manualmente)
   // bg-blue-600, text-blue-400, border-blue-500, etc.
@@ -47,6 +48,8 @@ export const ConfigProvider = ({ children }) => {
         if (settings.tax_iibb) setTaxIibb(settings.tax_iibb);
         if (settings.tax_start_date) setTaxStartDate(settings.tax_start_date);
         if (settings.tax_condition) setTaxCondition(settings.tax_condition);
+        if (settings.budget_enabled)
+          setBudgetEnabled(settings.budget_enabled === "true");
       }
     } catch (error) {
       console.error("Error loading settings:", error);
@@ -124,6 +127,8 @@ export const ConfigProvider = ({ children }) => {
         setTaxStartDate(newSettings.tax_start_date);
       if (newSettings.tax_condition !== undefined)
         setTaxCondition(newSettings.tax_condition);
+      if (newSettings.budget_enabled !== undefined)
+        setBudgetEnabled(newSettings.budget_enabled === "true");
 
       // Toast handled by component or here, let's return true for component handling
       return true;
@@ -251,6 +256,7 @@ export const ConfigProvider = ({ children }) => {
         taxIibb,
         taxStartDate,
         taxCondition,
+        budgetEnabled,
       }}
     >
       {children}
