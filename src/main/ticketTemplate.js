@@ -428,108 +428,120 @@ const generateBudgetHTML = (data) => {
   const storeName = data.storeName || "MI KIOSCO";
   const address = data.address || "";
   const date = data.date || "";
+  const validUntil = data.validUntil || "";
   const items = data.items || [];
   const total = parseFloat(data.total) || 0;
   const clientName = data.clientName || "Consumidor Final";
   const clientDni = data.clientDni || "-";
-  const clientCondition = data.clientCondicionIva || "Consumidor Final";
+  const clientEmail = data.clientEmail || "";
+  const clientPhone = data.clientPhone || "";
+  const refNumber = data.refNumber || String(Date.now()).slice(-6);
 
   // Items rows
   let itemsRows = "";
+  let subtotalSum = 0;
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    const subtotal = (item.price * item.quantity).toFixed(2);
-    itemsRows += `
-      <tr>
-        <td style="padding: 8px 10px; border-bottom: 1px solid #eee;">${item.name}</td>
-        <td style="padding: 8px 10px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
-        <td style="padding: 8px 10px; border-bottom: 1px solid #eee; text-align: right;">${parseFloat(item.price).toFixed(2)}</td>
-        <td style="padding: 8px 10px; border-bottom: 1px solid #eee; text-align: right;">${subtotal}</td>
-      </tr>
-    `;
+    const qty = item.quantity || item.cantidad || 1;
+    const price = parseFloat(item.price || item.sale_price) || 0;
+    const lineTotal = price * qty;
+    subtotalSum += lineTotal;
+    const bgColor = i % 2 === 0 ? "#ffffff" : "#f8fafc";
+    itemsRows +=
+      '<tr style="background: ' + bgColor + ';">' +
+      '<td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #334155;">' + qty + '</td>' +
+      '<td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #0f172a;">' + item.name + '</td>' +
+      '<td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 11px; color: #475569;">$ ' + price.toFixed(2) + '</td>' +
+      '<td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 11px; font-weight: 600; color: #0f172a;">$ ' + lineTotal.toFixed(2) + '</td>' +
+      '</tr>';
   }
 
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>Presupuesto</title>
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Helvetica, Arial, sans-serif; font-size: 11px; color: #000; width: 210mm; padding: 15mm 15mm; background: #fff; }
-      </style>
-    </head>
-    <body>
-      <!-- === HEADER PRINCIPAL === -->
-      <div style="position: relative; border: 1.5px solid #000; display: flex; min-height: 120px;">
-        <!-- Lado izquierdo -->
-        <div style="flex: 1; padding: 15px 20px; border-right: 1.5px solid #000; text-align: center; display: flex; flex-direction: column; justify-content: center;">
-          <div style="font-size: 28px; font-weight: bold; text-transform: uppercase; margin-bottom: 10px;">${storeName}</div>
-          <div style="font-size: 11px; color: #333; line-height: 1.6;">
-            ${address ? `<div>Domicilio: ${address}</div>` : ""}
-          </div>
-        </div>
-        <!-- Caja central con letra X (para presupuestos u otros documentos no fiscales) -->
-        <div style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #fff; border: 1.5px solid #000; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; z-index: 10;">
-          <span style="font-size: 24px; font-weight: bold;">X</span>
-        </div>
-        <div style="position: absolute; top: 30px; left: 50%; transform: translateX(-50%); font-size: 6px; font-weight: bold; text-align: center; z-index: 10; width: 80px; text-transform: uppercase;">
-          Documento no válido como factura
-        </div>
-        <!-- Lado derecho -->
-        <div style="flex: 1; padding: 15px 20px; text-align: left; display: flex; flex-direction: column; justify-content: center;">
-          <div style="font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 8px; letter-spacing: 1px;">PRESUPUESTO</div>
-          <div style="font-size: 11px; font-weight: bold; margin-bottom: 3px;">Fecha: ${date}</div>
-          <div style="font-size: 10px; color: #666; font-style: italic; margin-top: 5px;">
-            Presupuesto sujeto a cambios sin previo aviso.
-          </div>
-        </div>
-      </div>
+  var html =
+    '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+    '<title>Presupuesto</title>' +
+    '<style>' +
+    '* { margin: 0; padding: 0; box-sizing: border-box; }' +
+    "body { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 11px; color: #0f172a; width: 210mm; min-height: 297mm; padding: 18mm 18mm 20mm 18mm; background: #fff; }" +
+    '@page { margin: 0; size: A4; }' +
+    '</style></head><body>' +
 
-      <!-- === DATOS DEL CLIENTE === -->
-      <div style="border: 1.5px solid #000; border-top: none; padding: 10px 15px; font-size: 10px; line-height: 1.8;">
-        <div><span style="font-weight: bold;">Señor(es):</span> &nbsp;&nbsp; ${clientName} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span style="font-weight: bold;">DNI / CUIT:</span> &nbsp;&nbsp; ${clientDni}</div>
-        <div><span style="font-weight: bold;">Condición IVA:</span> &nbsp;&nbsp; ${clientCondition}</div>
-      </div>
+    // === HEADER ===
+    '<div style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 16px;">' +
+    '<div>' +
+    '<div style="font-size: 24px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">' + storeName + '</div>' +
+    (address ? '<div style="font-size: 10px; color: #64748b; margin-top: 4px;">' + address + '</div>' : '') +
+    '</div>' +
+    '<div style="text-align: right;">' +
+    '<div style="font-size: 30px; font-weight: 800; color: #164e63; letter-spacing: 1px;">PRESUPUESTO</div>' +
+    '<div style="font-size: 11px; color: #64748b; margin-top: 4px;">N.&deg; ' + refNumber + '</div>' +
+    '</div></div>' +
 
-      <!-- === TABLA DE ITEMS === -->
-      <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-        <thead>
-          <tr style="background: #f2f2f2; border: 1.5px solid #000;">
-            <th style="padding: 8px 10px; text-align: left; font-size: 11px; font-weight: bold; border: 1px solid #ccc;">Descripción</th>
-            <th style="padding: 8px 10px; text-align: center; font-size: 11px; font-weight: bold; border: 1px solid #ccc; width: 10%;">Cant.</th>
-            <th style="padding: 8px 10px; text-align: right; font-size: 11px; font-weight: bold; border: 1px solid #ccc; width: 15%;">P. Unitario</th>
-            <th style="padding: 8px 10px; text-align: right; font-size: 11px; font-weight: bold; border: 1px solid #ccc; width: 20%;">Subtotal</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${itemsRows}
-        </tbody>
-      </table>
+    // Accent line
+    '<div style="height: 3px; background: #164e63; border-radius: 2px;"></div>' +
+    '<div style="height: 1px; background: #e2e8f0; margin-top: 2px;"></div>' +
 
-      <!-- Linea bajo la tabla -->
-      <div style="border-top: 1.5px solid #000; margin-top: 5px;"></div>
+    // === INFO BLOCKS ===
+    '<div style="display: flex; justify-content: space-between; margin-top: 20px; gap: 30px;">' +
+    // Client
+    '<div style="flex: 1;">' +
+    '<div style="font-size: 8px; font-weight: 700; color: #164e63; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;">CLIENTE</div>' +
+    '<div style="font-size: 12px; font-weight: 600; color: #0f172a; margin-bottom: 4px;">' + clientName + '</div>' +
+    (clientDni && clientDni !== "-" ? '<div style="font-size: 10px; color: #64748b;">DNI/CUIT: ' + clientDni + '</div>' : '') +
+    (clientEmail ? '<div style="font-size: 10px; color: #64748b;">' + clientEmail + '</div>' : '') +
+    (clientPhone ? '<div style="font-size: 10px; color: #64748b;">Tel: ' + clientPhone + '</div>' : '') +
+    '</div>' +
+    // Details
+    '<div style="flex: 1;">' +
+    '<div style="font-size: 8px; font-weight: 700; color: #164e63; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;">DETALLES</div>' +
+    '<table style="font-size: 10px; border-collapse: collapse;">' +
+    '<tr><td style="color: #64748b; padding: 2px 10px 2px 0;">Fecha de emisi&oacute;n:</td><td style="font-weight: 600; color: #0f172a;">' + date + '</td></tr>' +
+    (validUntil ? '<tr><td style="color: #64748b; padding: 2px 10px 2px 0;">V&aacute;lido hasta:</td><td style="font-weight: 600; color: #0f172a;">' + validUntil + '</td></tr>' : '') +
+    '</table></div></div>' +
 
-      <!-- === TOTALES === -->
-      <div style="display: flex; justify-content: flex-end; margin-top: 15px; font-size: 12px;">
-        <div style="width: 250px;">
-          <div style="display: flex; justify-content: space-between; padding: 6px 8px; font-weight: bold; font-size: 15px; background: #f2f2f2; border: 1px solid #000;">
-            <span>TOTAL:</span>
-            <span>$${total.toFixed(2)}</span>
-          </div>
-        </div>
-      </div>
+    // === TABLE ===
+    '<table style="width: 100%; border-collapse: collapse; margin-top: 24px;">' +
+    '<thead><tr style="background: #164e63;">' +
+    '<th style="padding: 10px 14px; text-align: center; font-size: 9px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; width: 60px;">Cant.</th>' +
+    '<th style="padding: 10px 14px; text-align: left; font-size: 9px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px;">Descripci&oacute;n</th>' +
+    '<th style="padding: 10px 14px; text-align: right; font-size: 9px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; width: 110px;">P. Unitario</th>' +
+    '<th style="padding: 10px 14px; text-align: right; font-size: 9px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; width: 110px;">Importe</th>' +
+    '</tr></thead><tbody>' +
+    itemsRows +
+    '</tbody></table>' +
 
-      <!-- === PIE DE PAGINA === -->
-      <div style="margin-top: 50px; text-align: center; font-size: 9px; color: #777; border-top: 1px dashed #ccc; padding-top: 15px;">
-        Este documento es un presupuesto estimativo y no posee validez fiscal.
-      </div>
-    </body>
-    </html>
-  `;
+    // === TOTALS ===
+    '<div style="display: flex; justify-content: flex-end; margin-top: 20px;">' +
+    '<div style="width: 260px;">' +
+    '<div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 11px; color: #64748b;">' +
+    '<span>Subtotal:</span>' +
+    '<span style="color: #0f172a;">$ ' + subtotalSum.toFixed(2) + '</span>' +
+    '</div>' +
+    '<div style="height: 1px; background: #e2e8f0;"></div>' +
+    '<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; margin-top: 6px; background: #164e63; border-radius: 6px; color: #fff;">' +
+    '<span style="font-size: 12px; font-weight: 700;">TOTAL</span>' +
+    '<span style="font-size: 18px; font-weight: 800;">$ ' + total.toFixed(2) + '</span>' +
+    '</div></div></div>' +
+
+    // === OBSERVATIONS ===
+    '<div style="margin-top: 36px;">' +
+    '<div style="font-size: 8px; font-weight: 700; color: #164e63; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px;">Observaciones</div>' +
+    '<div style="font-size: 9px; color: #94a3b8; line-height: 1.6;">' +
+    'Los precios expresados son en pesos argentinos e incluyen IVA.<br>' +
+    (validUntil ? 'Este presupuesto tiene validez hasta el ' + validUntil + '.' : 'Este presupuesto es estimativo y no posee validez fiscal.') +
+    '</div></div>' +
+
+    // === FOOTER ===
+    '<div style="position: fixed; bottom: 18mm; left: 18mm; right: 18mm;">' +
+    '<div style="height: 1px; background: #e2e8f0; margin-bottom: 10px;"></div>' +
+    '<div style="display: flex; justify-content: space-between; font-size: 8px; color: #94a3b8;">' +
+    '<span>Generado por ' + storeName + '</span>' +
+    '<span>Presupuesto N.&deg; ' + refNumber + ' | ' + date + '</span>' +
+    '</div></div>' +
+
+    '</body></html>';
 
   return html;
 };
 
 module.exports = { generateTicketHTML, generateFacturaHTML, generateBudgetHTML };
+

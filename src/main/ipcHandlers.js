@@ -1228,6 +1228,7 @@ function registerIpcHandlers() {
       const settings = {
         kiosk_name: "Kiosco System",
         theme_color: "blue",
+        budget_enabled: "false",
       };
       rows.forEach((row) => {
         settings[row.key] = row.value;
@@ -1235,7 +1236,11 @@ function registerIpcHandlers() {
       return settings;
     } catch (error) {
       console.error("Error al obtener settings:", error);
-      return { kiosk_name: "Kiosco System", theme_color: "blue" };
+      return {
+        kiosk_name: "Kiosco System",
+        theme_color: "blue",
+        budget_enabled: "false",
+      };
     }
   });
 

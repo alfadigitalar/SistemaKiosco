@@ -210,11 +210,14 @@ app.whenReady().then(() => {
         storeName,
         address,
         date: budgetData.date,
+        validUntil: budgetData.validUntil || "",
         items: budgetData.items,
         total: budgetData.total,
         clientName: budgetData.clientName || "Consumidor Final",
         clientDni: budgetData.clientDni || "",
-        clientCondicionIva: budgetData.clientCondicionIva || "Consumidor Final",
+        clientEmail: budgetData.clientEmail || "",
+        clientPhone: budgetData.clientPhone || "",
+        refNumber: budgetData.refNumber || "",
       });
 
       // Cargar HTML

@@ -11,11 +11,11 @@ import {
   Printer,
   Mail,
   Calendar,
+  Zap,
+  Sparkles,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
 import PaymentModal from "../components/PaymentModal";
 import CustomerSearch from "../components/CustomerSearch";
 import WeightModal from "../components/WeightModal";
@@ -286,7 +286,7 @@ export default function PosScreen() {
           {
             id: `promo-alert-${promo.id}`, // ID único por promo
             duration: 8000,
-            // icon: "✨", // Removed emoji
+            icon: <Sparkles size={18} className="text-yellow-300" />,
             style: {
               background: "#7E22CE", // purple-700
               color: "#fff",
@@ -449,7 +449,9 @@ export default function PosScreen() {
         // Al dar Enter, si hay buffer válido (ej: código barras), lo procesamos
         if (buffer.length > 2 && !isInputFocused) {
           e.preventDefault();
-          toast.success("Escáner USB detectado ⚡");
+          toast.success("Escáner USB detectado", {
+            icon: <Zap size={18} className="text-yellow-400" />,
+          });
           setCodigo(buffer);
 
           window.api.getProductByBarcode(buffer).then((producto) => {
@@ -530,133 +532,62 @@ export default function PosScreen() {
       return;
     }
 
-    const validUntil = validUntilValue ? new Date(validUntilValue) : new Date();
-    if (Number.isNaN(validUntil.getTime())) {
+    const validUntil = validUntilValue ? new Date(validUntilValue) : null;
+    if (validUntilValue && (!validUntil || Number.isNaN(validUntil.getTime()))) {
       toast.error("La validez ingresada no es válida");
       return;
     }
 
-    const doc = new jsPDF({ unit: "pt", format: "a4" });
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 40;
-    const primary = [37, 99, 235];
-    const dark = [15, 23, 42];
-    const navy = [30, 41, 59];
-    const light = [248, 250, 252];
-    const line = [226, 232, 240];
-    const white = [255, 255, 255];
+    const formatBudgetDate = (date) =>
+      date.toLocaleDateString("es-AR", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      });
+    const formatBudgetDateTime = (date) =>
+      `${formatBudgetDate(date)}, ${date.toLocaleTimeString("es-AR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      })} hs`;
+
     const issueDate = new Date();
-    const issueDateText = `${issueDate.toLocaleDateString("es-AR")} ${issueDate.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
-    const validUntilText = `${validUntil.toLocaleDateString("es-AR")} ${validUntil.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
+    const issueDateText = formatBudgetDate(issueDate);
+    const validUntilText = validUntil
+      ? formatBudgetDateTime(validUntil)
+      : "";
 
-    doc.setFillColor(255, 255, 255);
-    doc.rect(0, 0, pageWidth, pageHeight, "F");
+    // Map cart items to the format the backend expects
+    const items = carrito.map((item) => ({
+      name: item.name,
+      quantity: item.cantidad,
+      price: parseFloat(item.sale_price),
+    }));
 
-    doc.setFillColor(...primary);
-    doc.rect(0, 0, pageWidth, 52, "F");
-    doc.setFillColor(...dark);
-    doc.rect(0, 52, pageWidth, 8, "F");
+    const totalAmount = carrito.reduce(
+      (sum, item) => sum + parseFloat(item.sale_price) * item.cantidad,
+      0
+    );
 
-    doc.setTextColor(...white);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(26);
-    doc.text("PRESUPUESTO", margin, 34);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(199, 210, 254);
-    doc.text("KUBO - Sistema Para Tu Kiosco", margin, 46);
-
-    doc.setFillColor(...light);
-    doc.roundedRect(margin, 72, pageWidth - margin * 2, 54, 8, 8, "F");
-    doc.setDrawColor(...line);
-    doc.setLineWidth(0.5);
-    doc.roundedRect(margin, 72, pageWidth - margin * 2, 54, 8, 8, "S");
-
-    doc.setTextColor(...dark);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.text("DATOS DEL CLIENTE", margin + 12, 86);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text(`Cliente: ${clienteSeleccionado?.name || "Consumidor Final"}`, margin + 12, 100);
-    doc.text(`Email: ${clienteSeleccionado?.email || "-"}`, margin + 12, 112);
-    doc.text(`Tel: ${clienteSeleccionado?.phone || "-"}`, margin + 12, 124);
-
-    doc.setFont("helvetica", "bold");
-    doc.text("DATOS DEL PRESUPUESTO", pageWidth / 2, 86);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text(`Emitido: ${issueDateText}`, pageWidth / 2, 100);
-    doc.text(`Válido hasta: ${validUntilText}`, pageWidth / 2, 112);
-    doc.text(`Ref: #${new Date().getTime().toString().slice(-6)}`, pageWidth / 2, 124);
-
-    autoTable(doc, {
-      startY: 140,
-      margin: { left: margin, right: margin },
-      theme: "striped",
-      headStyles: {
-        fillColor: navy,
-        textColor: 255,
-        fontStyle: "bold",
-        fontSize: 10,
-      },
-      bodyStyles: {
-        fontSize: 9,
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252],
-      },
-      styles: {
-        cellPadding: 5,
-        textColor: 50,
-        lineColor: [200, 200, 200],
-        lineWidth: 0.3,
-      },
-      columns: [
-        { header: "Cant.", dataKey: "cantidad", width: 20 },
-        { header: "Descripción del Producto", dataKey: "name", width: 90 },
-        { header: "P. Unitario", dataKey: "sale_price", width: 30 },
-        { header: "Importe", dataKey: "subtotal", width: 35 },
-      ],
-      body: carrito.map((item) => ({
-        cantidad: item.cantidad,
-        name: item.name,
-        sale_price: `$${item.sale_price.toFixed(2)}`,
-        subtotal: `$${(item.sale_price * item.cantidad).toFixed(2)}`,
-      })),
-    });
-
-    const finalY = doc.lastAutoTable?.finalY || 140;
-    const totalY = Math.min(finalY + 16, pageHeight - 80);
-
-    doc.setFillColor(...primary);
-    doc.roundedRect(margin, totalY, pageWidth - margin * 2, 38, 6, 6, "F");
-    doc.setTextColor(...white);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.text("TOTAL PRESUPUESTO", margin + 16, totalY + 16);
-    doc.setFontSize(20);
-    doc.text(`$${total.toFixed(2)}`, pageWidth - margin - 16, totalY + 26, { align: "right" });
-
-    doc.setTextColor(100, 116, 139);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text("KUBO - Sistema Integral para Kioscos", margin, pageHeight - 20);
-
-    const pdfBuffer = doc.output("arraybuffer");
     const result = await window.api.saveBudgetPdf({
-      pdfBuffer,
-      fileName: `presupuesto_${Date.now()}.pdf`,
+      date: issueDateText,
+      validUntil: validUntilText,
+      items,
+      total: totalAmount,
+      clientName: clienteSeleccionado?.name || "Consumidor Final",
+      clientDni: clienteSeleccionado?.dni || "-",
+      clientEmail: clienteSeleccionado?.email || "",
+      clientPhone: clienteSeleccionado?.phone || "",
+      refNumber: new Date().getTime().toString().slice(-6),
     });
 
     if (result.success) {
-      toast.success("Presupuesto guardado");
-    } else if (result.message !== "Guardado cancelado") {
-      toast.error(result.message || "No se pudo guardar el presupuesto");
+      toast.success("Presupuesto guardado correctamente");
+    } else if (!result.cancelled) {
+      toast.error(result.error || "No se pudo guardar el presupuesto");
     }
   };
+
 
   // ═══════════════════════════════════════════════════════════
   // FUNCIONES DE PRODUCTO
@@ -1126,7 +1057,7 @@ export default function PosScreen() {
   // RENDER
   // ═══════════════════════════════════════════════════════════
   return (
-    <div className="flex flex-col lg:flex-row min-h-full gap-4 text-slate-900 dark:text-white">
+    <div className="flex h-full min-h-0 flex-col lg:flex-row gap-3 text-slate-900 dark:text-white overflow-hidden">
       {/* Modal de Pago */}
       <PaymentModal
         isOpen={modalPagoAbierto}
@@ -1308,9 +1239,9 @@ export default function PosScreen() {
       {/* ════════════════════════════════════════════════════════ */}
       {/* SECCIÓN IZQUIERDA: LISTA DE PRODUCTOS */}
       {/* ════════════════════════════════════════════════════════ */}
-      <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700 transition-colors duration-300">
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col bg-white dark:bg-slate-800 rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700 transition-colors duration-300">
         {/* Header de la Tabla */}
-        <div className="bg-slate-100 dark:bg-slate-900 p-4 grid grid-cols-12 gap-4 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">
+        <div className="shrink-0 bg-slate-100 dark:bg-slate-900 p-4 grid grid-cols-12 gap-4 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">
           <div className="col-span-1">Cant.</div>
           <div className="col-span-6">Producto</div>
           <div className="col-span-2 text-right">Precio</div>
@@ -1319,7 +1250,7 @@ export default function PosScreen() {
         </div>
 
         {/* Cuerpo de la Tabla (Scrollable) */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-2">
+        <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
           {carrito.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 opacity-50">
               <ShoppingCart size={64} className="mb-4" />
@@ -1422,28 +1353,7 @@ export default function PosScreen() {
           </div>
         )}
 
-        <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex gap-2 relative z-20">
-          {/* Input de Cantidad Manual */}
-          <div className="relative w-28">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none select-none">
-              Cant.
-            </div>
-            <input
-              type="number"
-              min="0.001"
-              step="0.001"
-              value={inputCantidad}
-              onClick={(e) => e.target.select()}
-              onChange={(e) => setInputCantidad(e.target.value)}
-              className="w-full pl-10 pr-2 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl text-xl font-mono font-bold text-blue-600 dark:text-blue-400 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-sm text-center"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  inputRef.current?.focus(); // Salta al buscador al dar enter
-                }
-              }}
-            />
-          </div>
+        <div className="shrink-0 p-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex gap-2 relative z-20">
 
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
@@ -1464,7 +1374,7 @@ export default function PosScreen() {
                   }
                 }
               }}
-              className="w-full pl-12 pr-4 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl text-2xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition font-mono shadow-sm"
+              className="w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl text-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition font-mono shadow-sm"
               placeholder="Escanear o buscar producto..."
               autoComplete="off"
             />
@@ -1508,7 +1418,7 @@ export default function PosScreen() {
 
           <button
             onClick={handleOpenScanner}
-            className="px-6 py-4 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition flex items-center gap-2 font-bold shrink-0"
+            className="px-4 py-3 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition flex items-center gap-2 font-bold shrink-0"
             title="Usar Celular como Escáner"
           >
             <Smartphone size={20} />{" "}
@@ -1517,7 +1427,7 @@ export default function PosScreen() {
 
           <button
             onClick={() => setAdHocModalOpen(true)}
-            className="px-6 py-4 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded-xl transition flex items-center gap-2 font-bold shrink-0 border border-purple-200 dark:border-purple-800"
+            className="px-4 py-3 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded-xl transition flex items-center gap-2 font-bold shrink-0 border border-purple-200 dark:border-purple-800"
             title="Agregar Item Manual (Ad-Hoc)"
           >
             <span className="text-xl leading-none">+</span>{" "}
@@ -1528,15 +1438,15 @@ export default function PosScreen() {
       {/* ════════════════════════════════════════════════════════ */}
       {/* SECCIÓN DERECHA: TOTALES Y ACCIONES */}
       {/* ════════════════════════════════════════════════════════ */}
-      <div className="w-full lg:w-96 flex flex-col gap-4 shrink-0 h-auto lg:h-full overflow-y-auto pb-4">
+      <div className="w-full lg:w-[360px] xl:w-96 flex min-h-0 flex-col gap-3 shrink-0 h-full overflow-hidden">
         {/* Tarjeta de Usuario / Info */}
-        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg space-y-3 transition-colors duration-300">
+        <div className="shrink-0 bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg space-y-2 transition-colors duration-300">
           <div className="flex justify-between items-center text-slate-500 dark:text-slate-400 text-sm">
             <span>Cajero</span>
             <span>{new Date().toLocaleDateString()}</span>
           </div>
           <div className="flex justify-between items-center">
-            <div className="font-bold text-lg text-slate-800 dark:text-white">
+            <div className="font-bold text-base text-slate-800 dark:text-white">
               {JSON.parse(localStorage.getItem("user") || "{}").name ||
                 "Administrador"}
             </div>
@@ -1550,7 +1460,7 @@ export default function PosScreen() {
           </div>
 
           {/* Selector de Cliente */}
-          <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
+          <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
             <CustomerSearch
               customers={clientes}
               selectedCustomer={clienteSeleccionado}
@@ -1560,31 +1470,29 @@ export default function PosScreen() {
         </div>
 
         {/* Tarjeta de Totales */}
-        <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl flex flex-col transition-colors duration-300">
-          <div className="space-y-2">
-            <div className="flex justify-between text-slate-500 dark:text-slate-400 text-lg">
+        <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl flex flex-col transition-colors duration-300">
+          <div className="space-y-1.5 shrink-0">
+            <div className="flex justify-between text-slate-500 dark:text-slate-400 text-base">
               <span>Subtotal</span>
               <span>${subtotal.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-slate-500 dark:text-slate-400 text-lg">
+            <div className="flex justify-between text-slate-500 dark:text-slate-400 text-base">
               <span>Impuestos (0%)</span>
               <span>$0.00</span>
             </div>
             <div className="h-px bg-slate-200 dark:bg-slate-600 my-2"></div>
-            <div className="flex justify-between items-end">
-              <span className="text-xl font-bold text-slate-700 dark:text-slate-300">
-                Total a Pagar
-              </span>
-            </div>
           </div>
-          <div className="text-right text-4xl font-black text-slate-900 dark:text-green-400 tracking-tighter drop-shadow-sm">
-            <span className="text-green-600 dark:text-green-400">
+          <div className="shrink-0 flex items-end justify-between gap-3">
+            <span className="text-lg font-bold text-slate-700 dark:text-slate-300 leading-tight">
+              Total a Pagar
+            </span>
+            <span className="text-3xl font-black text-green-600 dark:text-green-400 tracking-tighter drop-shadow-sm leading-none">
               ${total.toFixed(2)}
             </span>
           </div>
 
           {/* Botones de Acción */}
-          <div className="grid gap-2 mt-4">
+          <div className="grid gap-2 mt-auto pt-3">
             {/* Toggles de Configuración Rápida */}
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -1593,7 +1501,7 @@ export default function PosScreen() {
                     invoiceMode === "ticket" ? "factura" : "ticket",
                   )
                 }
-                className={`p-2 rounded-lg text-xs font-bold border transition-colors flex flex-col items-center justify-center gap-1
+                className={`p-2 rounded-lg text-xs font-bold border transition-colors flex flex-col items-center justify-center gap-0.5
                   ${
                     invoiceMode === "factura"
                       ? "bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300"
@@ -1612,7 +1520,7 @@ export default function PosScreen() {
                 onClick={() =>
                   setPrintFormat(printFormat === "ticket" ? "a4" : "ticket")
                 }
-                className={`p-2 rounded-lg text-xs font-bold border transition-colors flex flex-col items-center justify-center gap-1
+                className={`p-2 rounded-lg text-xs font-bold border transition-colors flex flex-col items-center justify-center gap-0.5
                   ${
                     printFormat === "a4"
                       ? "bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-700 dark:text-indigo-300"
@@ -1630,7 +1538,7 @@ export default function PosScreen() {
             {/* Toggle Impresión */}
             <div
               onClick={() => setShouldPrintTicket(!shouldPrintTicket)}
-              className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
+              className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all ${
                 shouldPrintTicket
                   ? "bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800"
                   : "bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-700"
@@ -1670,10 +1578,19 @@ export default function PosScreen() {
               </div>
             </div>
 
+            <button
+              onClick={abrirModalPago}
+              className="w-full py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-green-900/30 flex items-center justify-center gap-2 transition transform active:scale-95"
+              title="Presiona F9 para cobrar rápido"
+            >
+              <CreditCard size={24} /> COBRAR{" "}
+              <span className="text-sm opacity-60 font-mono ml-1">[F9]</span>
+            </button>
+
             {budgetEnabled && (
               <button
                 onClick={openBudgetModal}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-blue-900/30 flex items-center justify-center gap-2 transition transform active:scale-95 mb-2"
+                className="w-full py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-orange-900/30 flex items-center justify-center gap-2 transition transform active:scale-95"
                 title="Presiona F5 para generar presupuesto"
               >
                 <Printer size={24} /> PRESUPUESTO{" "}
@@ -1682,17 +1599,8 @@ export default function PosScreen() {
             )}
 
             <button
-              onClick={abrirModalPago}
-              className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-green-900/30 flex items-center justify-center gap-2 transition transform active:scale-95"
-              title="Presiona F9 para cobrar rápido"
-            >
-              <CreditCard size={24} /> COBRAR{" "}
-              <span className="text-sm opacity-60 font-mono ml-1">[F9]</span>
-            </button>
-
-            <button
               onClick={cancelarVenta}
-              className="w-full py-3 bg-slate-100 hover:bg-red-50 dark:bg-slate-700 dark:hover:bg-red-900/50 text-slate-600 dark:text-slate-300 hover:text-red-500 dark:hover:text-red-200 rounded-xl font-semibold flex items-center justify-center gap-2 transition"
+              className="w-full py-2.5 bg-slate-100 hover:bg-red-50 dark:bg-slate-700 dark:hover:bg-red-900/50 text-slate-600 dark:text-slate-300 hover:text-red-500 dark:hover:text-red-200 rounded-xl font-semibold flex items-center justify-center gap-2 transition"
               title="Presiona ESC para cancelar"
             >
               <X size={20} /> Cancelar Venta{" "}
@@ -1792,7 +1700,7 @@ export default function PosScreen() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700 animate-in zoom-in-95 duration-200">
             <h3 className="text-xl font-bold mb-4 text-slate-800 dark:text-white flex items-center gap-2">
-              <span className="bg-blue-100 text-blue-600 p-1 rounded-lg text-sm">
+              <span className="bg-orange-100 text-orange-600 p-1 rounded-lg text-sm">
                 📅
               </span>
               Validez del Presupuesto
@@ -1808,7 +1716,7 @@ export default function PosScreen() {
                     autoFocus
                     value={budgetValidityDate}
                     onChange={(e) => setBudgetValidityDate(e.target.value)}
-                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition animate-none"
+                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none transition animate-none"
                   />
                 </div>
                 <div>
@@ -1819,7 +1727,7 @@ export default function PosScreen() {
                     type="time"
                     value={budgetValidityTime}
                     onChange={(e) => setBudgetValidityTime(e.target.value)}
-                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition animate-none"
+                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none transition animate-none"
                   />
                 </div>
               </div>
@@ -1836,7 +1744,7 @@ export default function PosScreen() {
                     setBudgetValidityModalOpen(false);
                     await generarPresupuesto(validUntilValue);
                   }}
-                  className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-900/30 transition hover:scale-105 active:scale-95"
+                  className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-lg shadow-orange-900/30 transition hover:scale-105 active:scale-95"
                 >
                   Generar PDF
                 </button>

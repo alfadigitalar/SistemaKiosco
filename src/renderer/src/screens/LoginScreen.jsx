@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { User, Lock, ArrowRight } from "lucide-react";
+import { User, Lock, ArrowRight, Gift } from "lucide-react";
 import confetti from "canvas-confetti";
 
 import logoKubo from "../assets/kubo_transparent.png";
@@ -53,9 +53,8 @@ const LoginScreen = () => {
             today.getMonth() === bday.getMonth()
           ) {
             toast(`¡Feliz Cumpleaños ${result.user.name}!`, {
-              // Removed emoji
               duration: 5000,
-              // icon: "🥳", // Removed emoji
+              icon: <Gift size={18} />,
               style: {
                 borderRadius: "10px",
                 background: "#FFD700",

@@ -92,6 +92,8 @@ const MainLayout = () => {
   };
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const isPosScreen =
+    location.pathname === "/ventas" || location.pathname === "/pos";
 
   return (
     <div className="flex h-screen bg-slate-100 dark:bg-slate-900 overflow-hidden transition-colors duration-300">
@@ -236,7 +238,13 @@ const MainLayout = () => {
         </div>
 
         {/* Content Scrollable Area */}
-        <main className="flex-1 overflow-auto p-4 lg:p-6 relative">
+        <main
+          className={`flex-1 relative ${
+            isPosScreen
+              ? "overflow-hidden p-3 lg:p-4"
+              : "overflow-auto p-4 lg:p-6"
+          }`}
+        >
           <Outlet />
         </main>
 

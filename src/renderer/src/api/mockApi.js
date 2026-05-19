@@ -335,6 +335,7 @@ export const mockApi = {
     theme_color: "purple",
     theme_mode: "dark",
     tax_enabled: "false", // Importante string
+    budget_enabled: "false",
   }),
 
   updateSettings: async (settings) => {
