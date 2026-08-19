@@ -26,8 +26,9 @@ async function initDatabase() {
     // Cargar SQL.js (librería puro JavaScript)
     SQL = await initSqlJs();
 
-    // Verificar si existe el archivo de base de datos
-    if (fs.existsSync(dbPath)) {
+    // Verificar si existe el archivo de base de datos antes de cargarlo
+    const dbExisted = fs.existsSync(dbPath);
+    if (dbExisted) {
       // Cargar base de datos existente desde archivo
       const filebuffer = fs.readFileSync(dbPath);
       db = new SQL.Database(filebuffer);
@@ -108,6 +109,24 @@ async function initDatabase() {
         );
       } catch (e) {
         // Ignorar si ya existen
+      }
+    }
+
+    // LÓGICA DE LICENCIA: Auto-activar si la base de datos existía previamente
+    let hasLicenseStatus = false;
+    try {
+      const res = db.exec("SELECT value FROM settings WHERE key = 'license_status'");
+      if (res.length && res[0].values.length) {
+        hasLicenseStatus = true;
+      }
+    } catch (e) {}
+
+    if (!hasLicenseStatus) {
+      if (dbExisted) {
+        console.log("[LICENSE] Detectado cliente existente (DB previa encontrada). Activando licencia automáticamente.");
+        db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('license_status', 'activated')");
+      } else {
+        console.log("[LICENSE] Nueva instalación. El estado de la licencia se definirá al iniciar la aplicación.");
       }
     }
 

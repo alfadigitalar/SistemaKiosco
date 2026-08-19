@@ -108,6 +108,13 @@ contextBridge.exposeInMainWorld("api", {
   updateSettings: (data) => ipcRenderer.invoke("update-settings", data),
 
   // ═══════════════════════════════════════════════════════════
+  // MÉTODOS DE LICENCIA Y PRUEBA
+  // ═══════════════════════════════════════════════════════════
+  checkLicenseStatus: () => ipcRenderer.invoke("check-license-status"),
+  startTrial: () => ipcRenderer.invoke("start-trial"),
+  activateLicense: (key) => ipcRenderer.invoke("activate-license", key),
+
+  // ═══════════════════════════════════════════════════════════
   // MÉTODOS DE USUARIO / AUTENTICACIÓN
   // ═══════════════════════════════════════════════════════════
 

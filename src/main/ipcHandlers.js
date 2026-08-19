@@ -3,12 +3,42 @@ const fs = require("fs");
 const path = require("path");
 const nodemailer = require("nodemailer");
 const { all, get, run } = require("./db");
+const { checkLicenseStatus, startTrial, activateLicense } = require("./licenseService");
 
 /**
  * Registra todos los handlers IPC para la aplicación.
  * Usa ASYNC/AWAIT con los wrappers de Promesa de db.js
  */
 function registerIpcHandlers() {
+  // ═══════════════════════════════════════════════════════════
+  // HANDLERS DE LICENCIA Y PRUEBA
+  // ═══════════════════════════════════════════════════════════
+  ipcMain.handle("check-license-status", async () => {
+    try {
+      return await checkLicenseStatus();
+    } catch (error) {
+      console.error("Error al comprobar licencia:", error);
+      return { status: "error", error: error.message };
+    }
+  });
+
+  ipcMain.handle("start-trial", async () => {
+    try {
+      return await startTrial();
+    } catch (error) {
+      console.error("Error al iniciar trial:", error);
+      return { success: false, message: error.message };
+    }
+  });
+
+  ipcMain.handle("activate-license", async (event, key) => {
+    try {
+      return await activateLicense(key);
+    } catch (error) {
+      console.error("Error al activar licencia:", error);
+      return { success: false, message: error.message };
+    }
+  });
   // ═══════════════════════════════════════════════════════════
   // HANDLERS DE PRODUCTOS
   // ═══════════════════════════════════════════════════════════

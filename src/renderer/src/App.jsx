@@ -20,6 +20,7 @@ import { ConfigProvider } from "./context/ConfigContext";
 import UsersScreen from "./screens/UsersScreen";
 import ConfiguracionScreen from "./screens/ConfiguracionScreen";
 import ReportesScreen from "./screens/ReportesScreen";
+import LicenseGate from "./components/LicenseGate";
 
 // Componentes Placeholder para secciones futuras
 
@@ -29,6 +30,7 @@ function App() {
       <div className="min-h-screen w-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-white overflow-x-hidden font-sans transition-colors duration-300">
         <ConfigProvider>
           <ErrorBoundary>
+            <LicenseGate>
             <Toaster
               position="top-center"
               reverseOrder={false}
@@ -96,8 +98,9 @@ function App() {
                 <Route path="/reportes" element={<ReportesScreen />} />
               </Route>
             </Routes>
-          </ErrorBoundary>
-        </ConfigProvider>
+          </LicenseGate>
+        </ErrorBoundary>
+      </ConfigProvider>
       </div>
     </Router>
   );

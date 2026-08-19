@@ -54,8 +54,8 @@
     "tailwind-merge": "^3.4.0"
   },
   "build": {
-    "appId": "com.kubopos.app",
-    "productName": "Kubo POS",
+    "appId": "com.kubopos.test",
+    "productName": "Kubo POS Test",
     "files": [
       "app/**/*",
       "src/main/**/*",
