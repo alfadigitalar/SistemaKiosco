@@ -1,6 +1,8 @@
 /**
  * Genera el HTML para el ticket de venta.
- * Soporta formato de 58mm y 80mm (responsive).
+ * Soporta formato de 58mm y 80mm.
+ * @param {Object} data - Datos del ticket
+ * @param {string} data.paperWidth - Ancho del papel: '58mm' o '80mm' (default: '58mm')
  */
 const generateTicketHTML = (data) => {
   const {
@@ -14,23 +16,33 @@ const generateTicketHTML = (data) => {
     logoUrl,
   } = data;
 
-  // Filas de items
+  // Determinar ancho del papel
+  const paperWidth = data.paperWidth || "58mm";
+  const is80mm = paperWidth === "80mm";
+
+  // Tamaños de fuente EXTRA GRANDES y DESTACADOS para máxima legibilidad
+  const fontSize = is80mm ? "19px" : "17px";
+  const headerFontSize = is80mm ? "34px" : "28px";
+  const metaFontSize = is80mm ? "17px" : "15px";
+  const itemFontSize = is80mm ? "20px" : "18px";
+  const totalFontSize = is80mm ? "38px" : "32px";
+
+  // Filas de items - permitir que los nombres se lean completos y claros
   const itemsRows = items
-    .map(
-      (item) => `
+    .map((item) => {
+      const subtotal = (item.price * item.quantity).toFixed(2);
+      return `
     <tr>
       <td class="qty">${item.quantity}</td>
       <td class="item">${item.name}</td>
-      <td class="price">$${(item.price * item.quantity).toFixed(2)}</td>
-    </tr>
-  `,
-    )
+      <td class="price">$${subtotal}</td>
+    </tr>`;
+    })
     .join("");
 
   const isA4 = data.format === "a4";
 
-  const css = isA4
-    ? `
+  const a4Css = `
         body {
           margin: 0;
           padding: 20mm;
@@ -114,86 +126,140 @@ const generateTicketHTML = (data) => {
           border-top: 1px solid #000;
           padding-top: 10px;
         }
-      `
-    : `
+      `;
+
+  const ticketCss = `
+        @page {
+          margin: 0;
+          size: ${paperWidth} auto;
+        }
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
         body {
           margin: 0;
-          padding: 10px;
-          font-family: 'Courier New', Courier, monospace;
-          font-size: 12px;
-          width: 270px; /* Aprox 58mm - margins */
+          padding: 10px 6px;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+          font-size: ${fontSize};
+          width: 100%;
+          max-width: 100%;
           color: #000;
+          background: #fff;
+          line-height: 1.35;
+          -webkit-font-smoothing: antialiased;
         }
         .header {
           text-align: center;
-          margin-bottom: 10px;
-          border-bottom: 1px dashed #000;
-          padding-bottom: 5px;
+          margin-bottom: 12px;
+          border-bottom: 2px dashed #000;
+          padding-bottom: 10px;
         }
         .header .logo {
-          max-width: 60%;
+          max-width: 80%;
+          max-height: 85px;
           height: auto;
-          margin-bottom: 5px;
+          margin-bottom: 8px;
           display: block;
           margin-left: auto;
           margin-right: auto;
-          filter: grayscale(100%) contrast(150%); /* Optimizar para tÃ©rmicas */
+          filter: grayscale(100%) contrast(180%);
         }
         .header h1 {
-          font-size: 16px;
+          font-size: ${headerFontSize};
+          font-weight: 900;
           margin: 0;
           text-transform: uppercase;
+          letter-spacing: -0.5px;
+          line-height: 1.15;
         }
         .header p {
-          margin: 2px 0;
-          font-size: 10px;
+          margin: 4px 0;
+          font-size: ${metaFontSize};
+          font-weight: 600;
         }
         .meta {
-          margin-bottom: 10px;
-          font-size: 10px;
+          margin-bottom: 12px;
+          font-size: ${metaFontSize};
+          line-height: 1.45;
+          border-bottom: 2px solid #000;
+          padding-bottom: 8px;
+        }
+        .meta p {
+          margin: 2px 0;
+          font-weight: 600;
         }
         table {
           width: 100%;
           border-collapse: collapse;
-          margin-bottom: 10px;
+          margin-bottom: 12px;
+          table-layout: fixed;
         }
         th {
           text-align: left;
-          border-bottom: 1px solid #000;
-          font-size: 10px;
+          border-bottom: 2px solid #000;
+          font-size: ${metaFontSize};
+          font-weight: 900;
+          padding: 6px 2px;
+          text-transform: uppercase;
         }
         td {
           vertical-align: top;
-          padding: 2px 0;
+          padding: 7px 2px;
+          font-size: ${itemFontSize};
+          line-height: 1.25;
+          border-bottom: 1px dotted #aaa;
         }
-        .qty { width: 10%; font-weight: bold; }
-        .item { width: 65%; font-size: 11px; }
-        .price { width: 25%; text-align: right; }
+        .qty {
+          width: 15%;
+          font-weight: 900;
+          text-align: center;
+        }
+        .item {
+          width: 51%;
+          word-break: break-word;
+          font-weight: 700;
+        }
+        .price {
+          width: 34%;
+          text-align: right;
+          font-weight: 900;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+          white-space: nowrap;
+        }
+        th:first-child { text-align: center; }
+        th:last-child { text-align: right; }
         
         .totals {
-          text-align: right;
-          border-top: 1px dashed #000;
-          padding-top: 5px;
-          margin-bottom: 10px;
+          border-top: 3px solid #000;
+          padding-top: 10px;
+          margin-bottom: 12px;
         }
         .totals .row {
           display: flex;
           justify-content: space-between;
-          margin-bottom: 2px;
+          align-items: center;
+          margin-bottom: 4px;
         }
         .grand-total {
-          font-size: 16px;
-          font-weight: bold;
-          margin-top: 5px;
+          font-size: ${totalFontSize};
+          font-weight: 900;
+          letter-spacing: -0.5px;
+          margin-top: 6px;
         }
         .footer {
           text-align: center;
-          font-size: 10px;
-          margin-top: 10px;
-          border-top: 1px solid #000;
-          padding-top: 5px;
+          font-size: ${metaFontSize};
+          font-weight: 600;
+          margin-top: 16px;
+          border-top: 2px dashed #000;
+          padding-top: 10px;
+          line-height: 1.4;
         }
       `;
+
+  const css = isA4 ? a4Css : ticketCss;
 
   return `
     <!DOCTYPE html>
@@ -221,7 +287,7 @@ const generateTicketHTML = (data) => {
         <thead>
           <tr>
             <th>Cant</th>
-            <th>Prod</th>
+            <th>Producto</th>
             <th>Total</th>
           </tr>
         </thead>
@@ -238,7 +304,7 @@ const generateTicketHTML = (data) => {
       </div>
 
       <div class="footer">
-        <p>${footerMessage || "Â¡Gracias por su compra!"}</p>
+        <p>${footerMessage || "¡Gracias por su compra!"}</p>
       </div>
     </body>
     </html>

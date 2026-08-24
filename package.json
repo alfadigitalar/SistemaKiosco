@@ -7,6 +7,9 @@
     "start": "electron .",
     "dev": "concurrently \"cross-env NODE_ENV=development vite\" \"wait-on tcp:5173 && cross-env NODE_ENV=development electron .\"",
     "build": "vite build && electron-builder",
+    "build:linux": "vite build && electron-builder --linux AppImage",
+    "build:win": "vite build && electron-builder --win nsis",
+    "build:all": "vite build && electron-builder --linux AppImage --win nsis",
     "build:web": "vite build",
     "lint": "eslint ."
   },
@@ -66,6 +69,11 @@
     "win": {
       "target": "nsis",
       "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon.png",
+      "category": "Office"
     },
     "nsis": {
       "oneClick": false,

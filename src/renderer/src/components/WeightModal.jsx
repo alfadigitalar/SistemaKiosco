@@ -45,9 +45,66 @@ const WeightModal = ({ isOpen, onClose, product, onConfirm }) => {
   const [quantity, setQuantity] = useState("");
 
   useEffect(() => {
+    let active = true;
+    let currentPort = null;
+    let currentReader = null;
+
     if (isOpen) {
       setQuantity("");
+
+      // Conectar automáticamente a la balanza si hay una vinculada
+      const connectScale = async () => {
+        if (!navigator.serial) return;
+        try {
+          const allPorts = await navigator.serial.getPorts();
+          const ports = allPorts.filter(p => p.getInfo && p.getInfo().usbVendorId !== undefined);
+          if (ports.length > 0) {
+            currentPort = ports[0];
+            await currentPort.open({ baudRate: 9600 });
+            
+            const textDecoder = new TextDecoder();
+            currentReader = currentPort.readable.getReader();
+            let buffer = "";
+            
+            while (active) {
+              const { value, done } = await currentReader.read();
+              if (done) break;
+              
+              if (value) {
+                buffer += textDecoder.decode(value);
+                // Buscar números con 3 decimales (formato típico Systel en kg)
+                const matches = buffer.match(/\d+\.\d{3}/g);
+                if (matches && matches.length > 0) {
+                  const latest = matches[matches.length - 1];
+                  const num = parseFloat(latest);
+                  if (!isNaN(num)) {
+                    setQuantity(num.toString());
+                  }
+                  buffer = buffer.slice(-20); // Mantener buffer limpio
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Error leyendo balanza:", e);
+        }
+      };
+      
+      connectScale();
     }
+
+    return () => {
+      active = false;
+      if (currentReader) {
+        currentReader.cancel().catch(() => {});
+      }
+      if (currentPort) {
+        // Pequeño delay para asegurar que el reader se canceló antes de cerrar
+        setTimeout(() => {
+          currentPort.close().catch(() => {});
+        }, 100);
+      }
+    };
   }, [isOpen]);
 
   if (!isOpen || !product) return null;

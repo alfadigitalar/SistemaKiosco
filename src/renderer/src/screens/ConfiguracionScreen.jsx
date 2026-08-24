@@ -16,6 +16,16 @@ import {
   Layout,
   CreditCard,
   Settings,
+  Eye,
+  Download,
+  Scale,
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+  Cpu,
+  FileText,
+  Image,
+  Smartphone,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import ConfirmationModal from "../components/ConfirmationModal";
@@ -45,6 +55,7 @@ const ConfiguracionScreen = () => {
 
   // State for Logo
   const [ticketLogo, setTicketLogo] = useState(null);
+  const [ticketPaperWidth, setTicketPaperWidth] = useState("58mm");
 
   // State for SMTP (Email)
   const [smtpHost, setSmtpHost] = useState("");
@@ -82,6 +93,108 @@ const ConfiguracionScreen = () => {
 
   const fileInputRef = useRef(null);
   const logoInputRef = useRef(null);
+
+  // State for Hardware / Balanza
+  const [scalePorts, setScalePorts] = useState([]);
+  const [isScaleTesting, setIsScaleTesting] = useState(false);
+  const [scaleLiveWeight, setScaleLiveWeight] = useState(null);
+  const [scaleRawData, setScaleRawData] = useState("");
+  const scaleReaderRef = useRef(null);
+  const scalePortRef = useRef(null);
+
+  const checkScalePorts = async () => {
+    if (navigator.serial) {
+      try {
+        const ports = await navigator.serial.getPorts();
+        const validUsbPorts = [];
+        for (const p of ports) {
+          const info = p.getInfo ? p.getInfo() : {};
+          if (info.usbVendorId !== undefined) {
+            validUsbPorts.push(p);
+          } else {
+            // Puerto dummy de motherboard (ttyS0), olvidarlo
+            if (p.forget) {
+              p.forget().catch(() => {});
+            }
+          }
+        }
+        setScalePorts(validUsbPorts);
+      } catch (err) {
+        console.error("Error getting serial ports:", err);
+      }
+    }
+  };
+
+  const startScaleTest = async () => {
+    if (!navigator.serial) {
+      toast.error("Web Serial no está soportado");
+      return;
+    }
+    try {
+      const allPorts = await navigator.serial.getPorts();
+      const validPorts = allPorts.filter(p => p.getInfo && p.getInfo().usbVendorId !== undefined);
+
+      if (!validPorts || validPorts.length === 0) {
+        toast.error("No hay balanzas USB vinculadas o conectadas.");
+        setScalePorts([]);
+        return;
+      }
+      const port = validPorts[0];
+      await port.open({ baudRate: 9600 });
+      scalePortRef.current = port;
+      setIsScaleTesting(true);
+      setScaleLiveWeight("0.000");
+      setScaleRawData("Esperando datos de la balanza a 9600 baud...");
+
+      const textDecoder = new TextDecoder();
+      const reader = port.readable.getReader();
+      scaleReaderRef.current = reader;
+
+      (async () => {
+        let buffer = "";
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            if (value) {
+              const text = textDecoder.decode(value);
+              buffer += text;
+              setScaleRawData(buffer.slice(-120));
+              const matches = buffer.match(/\d+\.\d{3}/g);
+              if (matches && matches.length > 0) {
+                const latest = matches[matches.length - 1];
+                setScaleLiveWeight(latest);
+                buffer = buffer.slice(-20);
+              }
+            }
+          }
+        } catch (e) {
+          console.log("Scale stream reading ended", e);
+        }
+      })();
+    } catch (err) {
+      console.error("Error starting scale test:", err);
+      toast.error("Error al abrir puerto: " + (err.message || "Puerto no disponible"));
+    }
+  };
+
+  const stopScaleTest = async () => {
+    setIsScaleTesting(false);
+    try {
+      if (scaleReaderRef.current) {
+        await scaleReaderRef.current.cancel().catch(() => {});
+        scaleReaderRef.current = null;
+      }
+      if (scalePortRef.current) {
+        setTimeout(async () => {
+          await scalePortRef.current.close().catch(() => {});
+          scalePortRef.current = null;
+        }, 150);
+      }
+    } catch (e) {
+      console.error("Error stopping scale test:", e);
+    }
+  };
 
   // Handle Avatar Selection
   const handleAvatarChange = (e) => {
@@ -121,11 +234,13 @@ const ConfiguracionScreen = () => {
         if (settings.smtp_port) setSmtpPort(settings.smtp_port);
         if (settings.smtp_user) setSmtpUser(settings.smtp_user);
         if (settings.smtp_pass) setSmtpPass(settings.smtp_pass);
+        if (settings.ticket_paper_width) setTicketPaperWidth(settings.ticket_paper_width);
       }
     });
 
     // Cargar backups iniciales
     loadBackups();
+    checkScalePorts();
 
     // Sync Tax
     setTaxEnabledLocal(taxEnabled);
@@ -191,6 +306,7 @@ const ConfiguracionScreen = () => {
         theme_color: selectedColor,
         theme_mode: selectedMode,
         ticket_logo: ticketLogo,
+        ticket_paper_width: ticketPaperWidth,
         smtp_host: smtpHost,
         smtp_port: smtpPort,
         smtp_user: smtpUser,
@@ -282,6 +398,7 @@ const ConfiguracionScreen = () => {
     { id: "general", label: "General", icon: <Settings size={20} /> },
     { id: "facturacion", label: "Facturación", icon: <CreditCard size={20} /> },
     { id: "sistema", label: "Sistema", icon: <Database size={20} /> },
+    { id: "hardware", label: "Hardware", icon: <Monitor size={20} /> },
     { id: "perfil", label: "Perfil", icon: <User size={20} /> },
   ];
 
@@ -525,6 +642,202 @@ const ConfiguracionScreen = () => {
                     )}
                   </div>
                 </div>
+
+                {/* Selector de ancho de papel térmico */}
+                <div className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-700">
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+                    Ancho de papel térmico
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                    Seleccioná el ancho de tu impresora térmica para que el ticket se ajuste correctamente.
+                  </p>
+                  <div className="flex gap-3 mb-4">
+                    <button
+                      onClick={() => setTicketPaperWidth("58mm")}
+                      className={`flex-1 py-3 px-4 rounded-xl border-2 text-center font-semibold transition-all ${
+                        ticketPaperWidth === "58mm"
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 shadow-md"
+                          : "border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-slate-400"
+                      }`}
+                    >
+                      <div className="text-lg">58mm</div>
+                      <div className="text-xs font-normal mt-1 opacity-70">Estándar pequeña</div>
+                    </button>
+                    <button
+                      onClick={() => setTicketPaperWidth("80mm")}
+                      className={`flex-1 py-3 px-4 rounded-xl border-2 text-center font-semibold transition-all ${
+                        ticketPaperWidth === "80mm"
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 shadow-md"
+                          : "border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-slate-400"
+                      }`}
+                    >
+                      <div className="text-lg">80mm</div>
+                      <div className="text-xs font-normal mt-1 opacity-70">Estándar grande</div>
+                    </button>
+                  </div>
+
+                  {/* Botones de Prueba e Impresión */}
+                  <div className="space-y-3">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await window.api.previewTicket({
+                              ticketId: "TEST",
+                              date: new Date().toLocaleString("es-AR"),
+                              items: [
+                                { name: "Coca Cola 500ml", quantity: 2, price: 1500 },
+                                { name: "Pan lactal Bimbo grande", quantity: 1, price: 2200 },
+                                { name: "Aceite Cocinero 900ml", quantity: 1, price: 3800 },
+                              ],
+                              total: 8500,
+                              format: "ticket",
+                              paperWidth: ticketPaperWidth,
+                            });
+                            toast.success("Vista previa abierta");
+                          } catch (e) {
+                            toast.error("Error al abrir vista previa");
+                          }
+                        }}
+                        className="flex-1 py-2.5 px-3 bg-slate-700 dark:bg-slate-600 hover:bg-slate-800 dark:hover:bg-slate-500 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <Eye size={15} />
+                        Vista previa térmica
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await window.api.printTicket({
+                              ticketId: "TEST",
+                              date: new Date().toLocaleString("es-AR"),
+                              items: [
+                                { name: "Coca Cola 500ml", quantity: 2, price: 1500 },
+                                { name: "Pan lactal Bimbo grande", quantity: 1, price: 2200 },
+                                { name: "Aceite Cocinero 900ml", quantity: 1, price: 3800 },
+                              ],
+                              total: 8500,
+                              format: "ticket",
+                              paperWidth: ticketPaperWidth,
+                            });
+                            toast.success("Enviado a imprimir");
+                          } catch (e) {
+                            toast.error("Error al imprimir ticket");
+                          }
+                        }}
+                        className="flex-1 py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <Printer size={15} />
+                        Imprimir en Térmica
+                      </button>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                      <p className="text-xs text-slate-500 mb-2 font-medium">Opciones de descarga y envío:</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {/* Descargar PNG para Fun Print / WhatsApp */}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const res = await window.api.saveTicketImage({
+                                ticketId: "TEST",
+                                date: new Date().toLocaleString("es-AR"),
+                                items: [
+                                  { name: "Coca Cola 500ml", quantity: 2, price: 1500 },
+                                  { name: "Pan lactal Bimbo grande", quantity: 1, price: 2200 },
+                                  { name: "Aceite Cocinero 900ml", quantity: 1, price: 3800 },
+                                ],
+                                total: 8500,
+                                format: "ticket",
+                                paperWidth: ticketPaperWidth,
+                              });
+                              if (res && res.success) {
+                                toast.success("Imagen PNG guardada (Lista para Fun Print / WhatsApp)");
+                              } else if (res && !res.canceled) {
+                                toast.error("Error al guardar imagen");
+                              }
+                            } catch (e) {
+                              toast.error("Error al generar imagen");
+                            }
+                          }}
+                          className="py-2.5 px-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors text-center shadow-sm"
+                          title="Descargar como imagen para imprimir por Bluetooth con Fun Print o mandar por WhatsApp"
+                        >
+                          <Smartphone size={15} />
+                          <span>PNG (Fun Print / Celular)</span>
+                        </button>
+
+                        {/* Descargar PDF A4 para impresoras comunes */}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const res = await window.api.saveTicketPdf({
+                                ticketId: "TEST",
+                                date: new Date().toLocaleString("es-AR"),
+                                items: [
+                                  { name: "Coca Cola 500ml", quantity: 2, price: 1500 },
+                                  { name: "Pan lactal Bimbo grande", quantity: 1, price: 2200 },
+                                  { name: "Aceite Cocinero 900ml", quantity: 1, price: 3800 },
+                                ],
+                                total: 8500,
+                                format: "a4",
+                              });
+                              if (res && res.success) {
+                                toast.success("Factura A4 guardada");
+                              } else if (res && !res.canceled) {
+                                toast.error("Error al guardar PDF A4");
+                              }
+                            } catch (e) {
+                              toast.error("Error al generar PDF A4");
+                            }
+                          }}
+                          className="py-2.5 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors text-center shadow-sm"
+                          title="Descargar en formato de hoja A4 para impresora de tinta/láser o comprobante"
+                        >
+                          <FileText size={15} />
+                          <span>PDF A4 (Tinta / Común)</span>
+                        </button>
+
+                        {/* Descargar PDF Térmico */}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const res = await window.api.saveTicketPdf({
+                                ticketId: "TEST",
+                                date: new Date().toLocaleString("es-AR"),
+                                items: [
+                                  { name: "Coca Cola 500ml", quantity: 2, price: 1500 },
+                                  { name: "Pan lactal Bimbo grande", quantity: 1, price: 2200 },
+                                  { name: "Aceite Cocinero 900ml", quantity: 1, price: 3800 },
+                                ],
+                                total: 8500,
+                                format: "ticket",
+                                paperWidth: ticketPaperWidth,
+                              });
+                              if (res && res.success) {
+                                toast.success("PDF Térmico guardado");
+                              } else if (res && !res.canceled) {
+                                toast.error("Error al guardar PDF");
+                              }
+                            } catch (e) {
+                              toast.error("Error al generar PDF");
+                            }
+                          }}
+                          className="py-2.5 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors text-center shadow-sm"
+                          title="Descargar en formato de rollo térmico continuo"
+                        >
+                          <Download size={15} />
+                          <span>PDF Térmico (Rollo)</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
               </div>
 
               {/* Sección Facturación Electrónica (ARCA / AFIP) */}
@@ -959,6 +1272,167 @@ const ConfiguracionScreen = () => {
               </div>
 
               <SaveButton />
+            </div>
+          )}
+
+          {/* TAB HARDWARE */}
+          {activeTab === "hardware" && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                    <Scale className="text-blue-500" />
+                    Balanza Electrónica (Systel / RS-232 / USB)
+                  </h3>
+                  <button
+                    onClick={checkScalePorts}
+                    className="text-xs text-slate-500 hover:text-blue-500 flex items-center gap-1 transition"
+                    title="Actualizar estado de conexión"
+                  >
+                    <RefreshCw size={14} /> Refrescar
+                  </button>
+                </div>
+
+                <p className="text-slate-600 dark:text-slate-400 mb-6 text-sm">
+                  Al conectar la balanza por cable RS-232 a USB, el sistema leerá el peso automáticamente en tiempo real cuando agregues cualquier producto fraccionable o pesado por kg a la venta.
+                </p>
+
+                {/* Estado de Vinculación */}
+                <div className="mb-6 p-4 rounded-xl border transition-all">
+                  {scalePorts.length > 0 ? (
+                    <div className="flex items-start justify-between flex-wrap gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                          <CheckCircle2 size={24} />
+                        </div>
+                        <div>
+                          <div className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                            Balanza Vinculada y Lista
+                            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            Dispositivo serial autorizado en este equipo.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {isScaleTesting ? (
+                          <button
+                            onClick={stopScaleTest}
+                            className="py-2 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                          >
+                            Detener Prueba
+                          </button>
+                        ) : (
+                          <button
+                            onClick={startScaleTest}
+                            className="py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                          >
+                            <Scale size={14} /> Probar Lectura en Vivo
+                          </button>
+                        )}
+
+                        <button
+                          onClick={async () => {
+                            try {
+                              if (isScaleTesting) await stopScaleTest();
+                              if (navigator.serial) {
+                                const all = await navigator.serial.getPorts();
+                                for (const p of all) {
+                                  if (p.forget) await p.forget().catch(() => {});
+                                }
+                              }
+                              setScalePorts([]);
+                              toast.success("Balanza desvinculada");
+                            } catch (e) {
+                              toast.error("Error al desvincular: " + e.message);
+                            }
+                          }}
+                          className="py-2 px-3 bg-slate-200 dark:bg-slate-700 hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-700 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 rounded-xl text-xs font-semibold transition"
+                        >
+                          Desvincular
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start justify-between flex-wrap gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center">
+                          <XCircle size={24} />
+                        </div>
+                        <div>
+                          <div className="font-bold text-slate-700 dark:text-slate-300">
+                            Ninguna Balanza Vinculada
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Conectá la balanza a un puerto USB y hacé clic en el botón para vincularla.
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={async () => {
+                          try {
+                            if (!navigator.serial) {
+                              toast.error("Tu sistema no soporta conexión serie.");
+                              return;
+                            }
+                            const port = await navigator.serial.requestPort();
+                            if (port) {
+                              toast.success("¡Balanza USB vinculada con éxito!");
+                              await checkScalePorts();
+                            }
+                          } catch (err) {
+                            console.error("Error vinculando balanza:", err);
+                            if (err.name === "NotFoundError" || err.message?.includes("No port selected")) {
+                              toast.error("No se detectó ninguna balanza USB conectada. Asegurate de enchufar el cable a la PC.");
+                            } else {
+                              toast.error("Error vinculando balanza: " + err.message);
+                            }
+                          }
+                        }}
+                        className="py-2.5 px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-2"
+                      >
+                        <Cpu size={15} /> Vincular Balanza USB / RS-232
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Panel de Prueba en Vivo */}
+                {isScaleTesting && (
+                  <div className="mt-4 p-5 rounded-2xl bg-slate-900 text-white border border-slate-700 animate-in fade-in zoom-in-95 duration-300 space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-emerald-400">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                        Prueba en Vivo Activa (9600 Baud)
+                      </div>
+                      <span className="text-xs text-slate-400">Poné un producto sobre la balanza</span>
+                    </div>
+
+                    <div className="flex flex-col items-center justify-center py-4 bg-slate-950/80 rounded-xl border border-slate-800">
+                      <span className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-1">
+                        Peso Detectado
+                      </span>
+                      <div className="text-5xl font-mono font-bold tracking-tight text-emerald-400 flex items-baseline gap-2">
+                        {scaleLiveWeight || "0.000"}
+                        <span className="text-xl text-slate-500 font-sans font-medium">kg</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-slate-400 mb-1 flex items-center justify-between">
+                        <span>Datos en bruto recibidos (Buffer Serie):</span>
+                        <span className="font-mono text-[10px] text-slate-500">Formato Systel Croma</span>
+                      </div>
+                      <pre className="p-2.5 rounded-lg bg-slate-950 text-slate-300 text-xs font-mono overflow-x-auto border border-slate-800/80">
+                        {scaleRawData || "Esperando flujo de bytes..."}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
