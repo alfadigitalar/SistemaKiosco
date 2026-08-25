@@ -102,9 +102,17 @@ function createWindow() {
 // CICLO DE VIDA DE LA APLICACIÓN
 // ═══════════════════════════════════════════════════════════
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // 1. Inicializar Base de Datos (SQLite)
-  initDatabase();
+  try {
+    await initDatabase();
+  } catch (error) {
+    console.error("Error crítico al iniciar la base de datos:", error);
+    const { dialog } = require("electron");
+    dialog.showErrorBox("Error de Base de Datos", "No se pudo iniciar la base de datos: " + error.message);
+    app.quit();
+    return;
+  }
 
   // 2. Registrar Handlers IPC (comunicación main<->renderer)
   registerIpcHandlers();
